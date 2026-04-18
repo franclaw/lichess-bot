@@ -1,0 +1,27 @@
+services:
+  lichess-bot:
+    image: node:24-bookworm-slim
+    init: true
+    restart: unless-stopped
+    working_dir: /app
+    command: sh -c "npm ci && npm start"
+    environment:
+      LICHESS_TOKEN: ${LICHESS_TOKEN:-}
+      BOT_USERNAME: ${BOT_USERNAME:-boscodebot}
+      AI_ENDPOINT: ${AI_ENDPOINT:-http://host.docker.internal:1234/v1}
+      AI_MODEL: ${AI_MODEL:-qwen/qwen3-coder-next}
+      AI_TEMPERATURE: ${AI_TEMPERATURE:-1}
+      REASONING_EFFORT: ${REASONING_EFFORT:-medium}
+      REASONING_TOKENS: ${REASONING_TOKENS:-408}
+      MAX_TOKENS: ${MAX_TOKENS:-512}
+      AUTO_ACCEPT_CHALLENGES: ${AUTO_ACCEPT_CHALLENGES:-true}
+      GAME_ALLOWLIST: ${GAME_ALLOWLIST:-}
+      GAME_BLOCKLIST: ${GAME_BLOCKLIST:-luPI1SBu}
+    extra_hosts:
+      - "host.docker.internal:host-gateway"
+    volumes:
+      - ./:/app
+      - lichess_bot_node_modules:/app/node_modules
+
+volumes:
+  lichess_bot_node_modules:

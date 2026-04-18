@@ -1,0 +1,20 @@
+{
+  "name": "lichess-bot",
+  "version": "1.0.0",
+  "description": "A bot that plays chess using a local OpenAI-compatible API endpoint",
+  "main": "index.cjs",
+  "scripts": {
+    "start": "node index.cjs"
+  },
+  "keywords": [
+    "lichess",
+    "bot",
+    "ai",
+    "chess"
+  ],
+  "author": "",
+  "license": "ISC",
+  "dependencies": {
+    "chess.js": "^1.4.0"
+  }
+}

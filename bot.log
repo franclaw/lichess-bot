@@ -1,0 +1,247 @@
+Starting Lichess AI Bot...
+
+Initializing bot...
+AI Endpoint: http://localhost:1234/v1
+My username: boscodebot
+
+[luPI1SBu] Last move: g6f4
+[luPI1SBu] Bot color: black, turn: white, isMyTurn=false, fen=unavailable
+Game luPI1SBu ended
+[luPI1SBu] Stream closed while game is active; reconnecting in 5s
+[luPI1SBu] Last move: g6f4
+[luPI1SBu] Bot color: black, turn: white, isMyTurn=false, fen=unavailable
+Game luPI1SBu ended
+[luPI1SBu] Stream closed while game is active; reconnecting in 5s
+[luPI1SBu] Last move: g6f4
+[luPI1SBu] Bot color: black, turn: white, isMyTurn=false, fen=unavailable
+Game luPI1SBu ended
+[luPI1SBu] Stream closed while game is active; reconnecting in 5s
+[luPI1SBu] Last move: g6f4
+[luPI1SBu] Bot color: black, turn: white, isMyTurn=false, fen=unavailable
+[luPI1SBu] Last move: e1g1
+[luPI1SBu] Bot color: black, turn: black, isMyTurn=true, fen=unavailable
+[luPI1SBu] It's our turn! Position: e2e4 e7e5 g1f3 g8f6 f3e5 f8c5 d2d4 b8c6 d4c5 c6e5 d1d6 c7d6 c5d6 e8g8 c1f4 e5g6 f1a6 g6f4 e1g1
+[luPI1SBu] AI thinking...
+[luPI1SBu] AI chose illegal move locally: f8g7, trying again...
+[luPI1SBu] AI chose illegal move locally: f8g7, trying again...
+[luPI1SBu] AI chose illegal move locally: f1a6, trying again...
+[luPI1SBu] Falling back to legal move: a8b8
+[luPI1SBu] Fallback move successful: a8b8
+[luPI1SBu] Last move: a8b8
+[luPI1SBu] Bot color: black, turn: white, isMyTurn=false, fen=unavailable
+Game luPI1SBu ended
+[luPI1SBu] Stream closed while game is active; reconnecting in 5s
+[luPI1SBu] Last move: a8b8
+[luPI1SBu] Bot color: black, turn: white, isMyTurn=false, fen=unavailable
+[luPI1SBu] Last move: e4e5
+[luPI1SBu] Bot color: black, turn: black, isMyTurn=true, fen=unavailable
+[luPI1SBu] It's our turn! Position: e2e4 e7e5 g1f3 g8f6 f3e5 f8c5 d2d4 b8c6 d4c5 c6e5 d1d6 c7d6 c5d6 e8g8 c1f4 e5g6 f1a6 g6f4 e1g1 a8b8 e4e5
+[luPI1SBu] AI thinking...
+[luPI1SBu] AI chose illegal move locally: f8g7, trying again...
+[luPI1SBu] AI chose illegal move locally: f8g7, trying again...
+[luPI1SBu] AI chose illegal move locally: f8g7, trying again...
+[luPI1SBu] Falling back to legal move: b8a8
+[luPI1SBu] Fallback move successful: b8a8
+[luPI1SBu] Last move: b8a8
+[luPI1SBu] Bot color: black, turn: white, isMyTurn=false, fen=unavailable
+[luPI1SBu] Last move: e5f6
+[luPI1SBu] Bot color: black, turn: black, isMyTurn=true, fen=unavailable
+[luPI1SBu] It's our turn! Position: e2e4 e7e5 g1f3 g8f6 f3e5 f8c5 d2d4 b8c6 d4c5 c6e5 d1d6 c7d6 c5d6 e8g8 c1f4 e5g6 f1a6 g6f4 e1g1 a8b8 e4e5 b8a8 e5f6
+[luPI1SBu] AI thinking...
+[luPI1SBu] Attempting move: g8h8 (attempt 1)
+[luPI1SBu] Move successful: g8h8
+[luPI1SBu] Last move: g8h8
+[luPI1SBu] Bot color: black, turn: white, isMyTurn=false, fen=unavailable
+[luPI1SBu] Last move: f6g7
+[luPI1SBu] Bot color: black, turn: black, isMyTurn=true, fen=unavailable
+[luPI1SBu] It's our turn! Position: e2e4 e7e5 g1f3 g8f6 f3e5 f8c5 d2d4 b8c6 d4c5 c6e5 d1d6 c7d6 c5d6 e8g8 c1f4 e5g6 f1a6 g6f4 e1g1 a8b8 e4e5 b8a8 e5f6 g8h8 f6g7
+[luPI1SBu] AI thinking...
+[luPI1SBu] Attempting move: h8g8 (attempt 1)
+[luPI1SBu] Move successful: h8g8
+[luPI1SBu] Last move: h8g8
+[luPI1SBu] Bot color: black, turn: white, isMyTurn=false, fen=unavailable
+[luPI1SBu] Last move: g7f8q
+[luPI1SBu] Bot color: black, turn: black, isMyTurn=true, fen=unavailable
+[luPI1SBu] It's our turn! Position: e2e4 e7e5 g1f3 g8f6 f3e5 f8c5 d2d4 b8c6 d4c5 c6e5 d1d6 c7d6 c5d6 e8g8 c1f4 e5g6 f1a6 g6f4 e1g1 a8b8 e4e5 b8a8 e5f6 g8h8 f6g7 h8g8 g7f8q
+[luPI1SBu] AI thinking...
+[luPI1SBu] Attempting move: g8f8 (attempt 1)
+[luPI1SBu] Move successful: g8f8
+[luPI1SBu] Last move: g8f8
+[luPI1SBu] Bot color: black, turn: white, isMyTurn=false, fen=unavailable
+[luPI1SBu] Last move: g2g3
+[luPI1SBu] Bot color: black, turn: black, isMyTurn=true, fen=unavailable
+[luPI1SBu] It's our turn! Position: e2e4 e7e5 g1f3 g8f6 f3e5 f8c5 d2d4 b8c6 d4c5 c6e5 d1d6 c7d6 c5d6 e8g8 c1f4 e5g6 f1a6 g6f4 e1g1 a8b8 e4e5 b8a8 e5f6 g8h8 f6g7 h8g8 g7f8q g8f8 g2g3
+[luPI1SBu] AI thinking...
+[luPI1SBu] Attempting move: f8g7 (attempt 1)
+[luPI1SBu] Move successful: f8g7
+[luPI1SBu] Last move: f8g7
+[luPI1SBu] Bot color: black, turn: white, isMyTurn=false, fen=unavailable
+[luPI1SBu] Last move: g3f4
+[luPI1SBu] Bot color: black, turn: black, isMyTurn=true, fen=unavailable
+[luPI1SBu] It's our turn! Position: e2e4 e7e5 g1f3 g8f6 f3e5 f8c5 d2d4 b8c6 d4c5 c6e5 d1d6 c7d6 c5d6 e8g8 c1f4 e5g6 f1a6 g6f4 e1g1 a8b8 e4e5 b8a8 e5f6 g8h8 f6g7 h8g8 g7f8q g8f8 g2g3 f8g7 g3f4
+[luPI1SBu] AI thinking...
+[luPI1SBu] Attempting move: g7f8 (attempt 1)
+[luPI1SBu] Move successful: g7f8
+[luPI1SBu] Last move: g7f8
+[luPI1SBu] Bot color: black, turn: white, isMyTurn=false, fen=unavailable
+[luPI1SBu] Last move: g7f8
+[luPI1SBu] Bot color: black, turn: white, isMyTurn=false, fen=unavailable
+[luPI1SBu] Last move: a6c4
+[luPI1SBu] Bot color: black, turn: black, isMyTurn=true, fen=unavailable
+[luPI1SBu] It's our turn! Position: e2e4 e7e5 g1f3 g8f6 f3e5 f8c5 d2d4 b8c6 d4c5 c6e5 d1d6 c7d6 c5d6 e8g8 c1f4 e5g6 f1a6 g6f4 e1g1 a8b8 e4e5 b8a8 e5f6 g8h8 f6g7 h8g8 g7f8q g8f8 g2g3 f8g7 g3f4 g7f8 a6c4
+[luPI1SBu] AI thinking...
+[luPI1SBu] Attempting move: f8g7 (attempt 1)
+[luPI1SBu] Move successful: f8g7
+[luPI1SBu] Last move: f8g7
+[luPI1SBu] Bot color: black, turn: white, isMyTurn=false, fen=unavailable
+[luPI1SBu] Last move: f8g7
+[luPI1SBu] Bot color: black, turn: white, isMyTurn=false, fen=unavailable
+[luPI1SBu] Last move: c4d5
+[luPI1SBu] Bot color: black, turn: black, isMyTurn=true, fen=unavailable
+[luPI1SBu] It's our turn! Position: e2e4 e7e5 g1f3 g8f6 f3e5 f8c5 d2d4 b8c6 d4c5 c6e5 d1d6 c7d6 c5d6 e8g8 c1f4 e5g6 f1a6 g6f4 e1g1 a8b8 e4e5 b8a8 e5f6 g8h8 f6g7 h8g8 g7f8q g8f8 g2g3 f8g7 g3f4 g7f8 a6c4 f8g7 c4d5
+[luPI1SBu] AI thinking...
+[luPI1SBu] Attempting move: g7f8 (attempt 1)
+[luPI1SBu] Move successful: g7f8
+[luPI1SBu] Last move: g7f8
+[luPI1SBu] Bot color: black, turn: white, isMyTurn=false, fen=unavailable
+[luPI1SBu] Last move: b1c3
+[luPI1SBu] Bot color: black, turn: black, isMyTurn=true, fen=unavailable
+[luPI1SBu] It's our turn! Position: e2e4 e7e5 g1f3 g8f6 f3e5 f8c5 d2d4 b8c6 d4c5 c6e5 d1d6 c7d6 c5d6 e8g8 c1f4 e5g6 f1a6 g6f4 e1g1 a8b8 e4e5 b8a8 e5f6 g8h8 f6g7 h8g8 g7f8q g8f8 g2g3 f8g7 g3f4 g7f8 a6c4 f8g7 c4d5 g7f8 b1c3
+[luPI1SBu] AI thinking...
+[luPI1SBu] Attempting move: f8g7 (attempt 1)
+[luPI1SBu] Move successful: f8g7
+[luPI1SBu] Last move: f8g7
+[luPI1SBu] Bot color: black, turn: white, isMyTurn=false, fen=unavailable
+[luPI1SBu] Last move: f8g7
+[luPI1SBu] Bot color: black, turn: white, isMyTurn=false, fen=unavailable
+[luPI1SBu] Last move: f4f5
+[luPI1SBu] Bot color: black, turn: black, isMyTurn=true, fen=unavailable
+[luPI1SBu] It's our turn! Position: e2e4 e7e5 g1f3 g8f6 f3e5 f8c5 d2d4 b8c6 d4c5 c6e5 d1d6 c7d6 c5d6 e8g8 c1f4 e5g6 f1a6 g6f4 e1g1 a8b8 e4e5 b8a8 e5f6 g8h8 f6g7 h8g8 g7f8q g8f8 g2g3 f8g7 g3f4 g7f8 a6c4 f8g7 c4d5 g7f8 b1c3 f8g7 f4f5
+[luPI1SBu] AI thinking...
+[luPI1SBu] Attempting move: g7f8 (attempt 1)
+[luPI1SBu] Move successful: g7f8
+[luPI1SBu] Last move: g7f8
+[luPI1SBu] Bot color: black, turn: white, isMyTurn=false, fen=unavailable
+[luPI1SBu] Last move: f1e1
+[luPI1SBu] Bot color: black, turn: black, isMyTurn=true, fen=unavailable
+[luPI1SBu] It's our turn! Position: e2e4 e7e5 g1f3 g8f6 f3e5 f8c5 d2d4 b8c6 d4c5 c6e5 d1d6 c7d6 c5d6 e8g8 c1f4 e5g6 f1a6 g6f4 e1g1 a8b8 e4e5 b8a8 e5f6 g8h8 f6g7 h8g8 g7f8q g8f8 g2g3 f8g7 g3f4 g7f8 a6c4 f8g7 c4d5 g7f8 b1c3 f8g7 f4f5 g7f8 f1e1
+[luPI1SBu] AI thinking...
+[luPI1SBu] AI chose illegal move locally: g8f8, trying again...
+[luPI1SBu] AI chose illegal move locally: g8f8, trying again...
+[luPI1SBu] AI chose illegal move locally: g7h6, trying again...
+[luPI1SBu] Falling back to legal move: a8b8
+[luPI1SBu] Fallback move successful: a8b8
+[luPI1SBu] Last move: a8b8
+[luPI1SBu] Bot color: black, turn: white, isMyTurn=false, fen=unavailable
+[luPI1SBu] Last move: d5c6
+[luPI1SBu] Bot color: black, turn: black, isMyTurn=true, fen=unavailable
+[luPI1SBu] It's our turn! Position: e2e4 e7e5 g1f3 g8f6 f3e5 f8c5 d2d4 b8c6 d4c5 c6e5 d1d6 c7d6 c5d6 e8g8 c1f4 e5g6 f1a6 g6f4 e1g1 a8b8 e4e5 b8a8 e5f6 g8h8 f6g7 h8g8 g7f8q g8f8 g2g3 f8g7 g3f4 g7f8 a6c4 f8g7 c4d5 g7f8 b1c3 f8g7 f4f5 g7f8 f1e1 a8b8 d5c6
+[luPI1SBu] AI thinking...
+[luPI1SBu] AI chose illegal move locally: b8c6, trying again...
+[luPI1SBu] AI chose illegal move locally: b8c6, trying again...
+[luPI1SBu] AI chose illegal move locally: b8c6, trying again...
+[luPI1SBu] Falling back to legal move: b8a8
+[luPI1SBu] Fallback move successful: b8a8
+[luPI1SBu] Last move: b8a8
+[luPI1SBu] Bot color: black, turn: white, isMyTurn=false, fen=unavailable
+[luPI1SBu] Last move: e1e7
+[luPI1SBu] Bot color: black, turn: black, isMyTurn=true, fen=unavailable
+[luPI1SBu] It's our turn! Position: e2e4 e7e5 g1f3 g8f6 f3e5 f8c5 d2d4 b8c6 d4c5 c6e5 d1d6 c7d6 c5d6 e8g8 c1f4 e5g6 f1a6 g6f4 e1g1 a8b8 e4e5 b8a8 e5f6 g8h8 f6g7 h8g8 g7f8q g8f8 g2g3 f8g7 g3f4 g7f8 a6c4 f8g7 c4d5 g7f8 b1c3 f8g7 f4f5 g7f8 f1e1 a8b8 d5c6 b8a8 e1e7
+[luPI1SBu] AI thinking...
+[luPI1SBu] Attempting move: f8g7 (attempt 1)
+[luPI1SBu] Move successful: f8g7
+[luPI1SBu] Last move: f8g7
+[luPI1SBu] Bot color: black, turn: white, isMyTurn=false, fen=unavailable
+[luPI1SBu] Last move: e7f7
+[luPI1SBu] Bot color: black, turn: black, isMyTurn=true, fen=unavailable
+[luPI1SBu] It's our turn! Position: e2e4 e7e5 g1f3 g8f6 f3e5 f8c5 d2d4 b8c6 d4c5 c6e5 d1d6 c7d6 c5d6 e8g8 c1f4 e5g6 f1a6 g6f4 e1g1 a8b8 e4e5 b8a8 e5f6 g8h8 f6g7 h8g8 g7f8q g8f8 g2g3 f8g7 g3f4 g7f8 a6c4 f8g7 c4d5 g7f8 b1c3 f8g7 f4f5 g7f8 f1e1 a8b8 d5c6 b8a8 e1e7 f8g7 e7f7
+[luPI1SBu] AI thinking...
+[luPI1SBu] AI chose illegal move locally: g7f8, trying again...
+[luPI1SBu] Attempting move: g7h6 (attempt 2)
+[luPI1SBu] Move successful: g7h6
+[luPI1SBu] Last move: g7h6
+[luPI1SBu] Bot color: black, turn: white, isMyTurn=false, fen=unavailable
+[luPI1SBu] Last move: c6d7
+[luPI1SBu] Bot color: black, turn: black, isMyTurn=true, fen=unavailable
+[luPI1SBu] It's our turn! Position: e2e4 e7e5 g1f3 g8f6 f3e5 f8c5 d2d4 b8c6 d4c5 c6e5 d1d6 c7d6 c5d6 e8g8 c1f4 e5g6 f1a6 g6f4 e1g1 a8b8 e4e5 b8a8 e5f6 g8h8 f6g7 h8g8 g7f8q g8f8 g2g3 f8g7 g3f4 g7f8 a6c4 f8g7 c4d5 g7f8 b1c3 f8g7 f4f5 g7f8 f1e1 a8b8 d5c6 b8a8 e1e7 f8g7 e7f7 g7h6 c6d7
+[luPI1SBu] AI thinking...
+[luPI1SBu] Attempting move: h6g5 (attempt 1)
+[luPI1SBu] Move successful: h6g5
+[luPI1SBu] Last move: h6g5
+[luPI1SBu] Bot color: black, turn: white, isMyTurn=false, fen=unavailable
+[luPI1SBu] Last move: c3e4
+[luPI1SBu] Bot color: black, turn: black, isMyTurn=true, fen=unavailable
+[luPI1SBu] It's our turn! Position: e2e4 e7e5 g1f3 g8f6 f3e5 f8c5 d2d4 b8c6 d4c5 c6e5 d1d6 c7d6 c5d6 e8g8 c1f4 e5g6 f1a6 g6f4 e1g1 a8b8 e4e5 b8a8 e5f6 g8h8 f6g7 h8g8 g7f8q g8f8 g2g3 f8g7 g3f4 g7f8 a6c4 f8g7 c4d5 g7f8 b1c3 f8g7 f4f5 g7f8 f1e1 a8b8 d5c6 b8a8 e1e7 f8g7 e7f7 g7h6 c6d7 h6g5 c3e4
+[luPI1SBu] AI thinking...
+[luPI1SBu] Attempting move: g5h6 (attempt 1)
+[luPI1SBu] Move successful: g5h6
+[luPI1SBu] Last move: g5h6
+[luPI1SBu] Bot color: black, turn: white, isMyTurn=false, fen=unavailable
+[luPI1SBu] Last move: c2c3
+[luPI1SBu] Bot color: black, turn: black, isMyTurn=true, fen=unavailable
+[luPI1SBu] It's our turn! Position: e2e4 e7e5 g1f3 g8f6 f3e5 f8c5 d2d4 b8c6 d4c5 c6e5 d1d6 c7d6 c5d6 e8g8 c1f4 e5g6 f1a6 g6f4 e1g1 a8b8 e4e5 b8a8 e5f6 g8h8 f6g7 h8g8 g7f8q g8f8 g2g3 f8g7 g3f4 g7f8 a6c4 f8g7 c4d5 g7f8 b1c3 f8g7 f4f5 g7f8 f1e1 a8b8 d5c6 b8a8 e1e7 f8g7 e7f7 g7h6 c6d7 h6g5 c3e4 g5h6 c2c3
+[luPI1SBu] AI thinking...
+[luPI1SBu] AI chose illegal move locally: h6g5, trying again...
+[luPI1SBu] AI chose illegal move locally: h6g5, trying again...
+[luPI1SBu] AI chose illegal move locally: h6g5, trying again...
+[luPI1SBu] Falling back to legal move: a8b8
+[luPI1SBu] Fallback move successful: a8b8
+[luPI1SBu] Last move: a8b8
+[luPI1SBu] Bot color: black, turn: white, isMyTurn=false, fen=unavailable
+[luPI1SBu] Last move: f7f6
+[luPI1SBu] Bot color: black, turn: black, isMyTurn=true, fen=unavailable
+[luPI1SBu] It's our turn! Position: e2e4 e7e5 g1f3 g8f6 f3e5 f8c5 d2d4 b8c6 d4c5 c6e5 d1d6 c7d6 c5d6 e8g8 c1f4 e5g6 f1a6 g6f4 e1g1 a8b8 e4e5 b8a8 e5f6 g8h8 f6g7 h8g8 g7f8q g8f8 g2g3 f8g7 g3f4 g7f8 a6c4 f8g7 c4d5 g7f8 b1c3 f8g7 f4f5 g7f8 f1e1 a8b8 d5c6 b8a8 e1e7 f8g7 e7f7 g7h6 c6d7 h6g5 c3e4 g5h6 c2c3 a8b8 f7f6
+[luPI1SBu] AI thinking...
+[luPI1SBu] AI chose illegal move locally: h6g5, trying again...
+[luPI1SBu] AI chose illegal move locally: h6g5, trying again...
+[luPI1SBu] AI chose illegal move locally: h6g5, trying again...
+[luPI1SBu] Falling back to legal move: d8f6
+[luPI1SBu] Fallback move successful: d8f6
+[luPI1SBu] Last move: d8f6
+[luPI1SBu] Bot color: black, turn: white, isMyTurn=false, fen=unavailable
+[luPI1SBu] Last move: e4f6
+[luPI1SBu] Bot color: black, turn: black, isMyTurn=true, fen=unavailable
+[luPI1SBu] It's our turn! Position: e2e4 e7e5 g1f3 g8f6 f3e5 f8c5 d2d4 b8c6 d4c5 c6e5 d1d6 c7d6 c5d6 e8g8 c1f4 e5g6 f1a6 g6f4 e1g1 a8b8 e4e5 b8a8 e5f6 g8h8 f6g7 h8g8 g7f8q g8f8 g2g3 f8g7 g3f4 g7f8 a6c4 f8g7 c4d5 g7f8 b1c3 f8g7 f4f5 g7f8 f1e1 a8b8 d5c6 b8a8 e1e7 f8g7 e7f7 g7h6 c6d7 h6g5 c3e4 g5h6 c2c3 a8b8 f7f6 d8f6 e4f6
+[luPI1SBu] AI thinking...
+[luPI1SBu] Attempting move: h6g5 (attempt 1)
+[luPI1SBu] Move successful: h6g5
+[luPI1SBu] Last move: h6g5
+[luPI1SBu] Bot color: black, turn: white, isMyTurn=false, fen=unavailable
+[luPI1SBu] Last move: f6h7
+[luPI1SBu] Bot color: black, turn: black, isMyTurn=true, fen=unavailable
+[luPI1SBu] It's our turn! Position: e2e4 e7e5 g1f3 g8f6 f3e5 f8c5 d2d4 b8c6 d4c5 c6e5 d1d6 c7d6 c5d6 e8g8 c1f4 e5g6 f1a6 g6f4 e1g1 a8b8 e4e5 b8a8 e5f6 g8h8 f6g7 h8g8 g7f8q g8f8 g2g3 f8g7 g3f4 g7f8 a6c4 f8g7 c4d5 g7f8 b1c3 f8g7 f4f5 g7f8 f1e1 a8b8 d5c6 b8a8 e1e7 f8g7 e7f7 g7h6 c6d7 h6g5 c3e4 g5h6 c2c3 a8b8 f7f6 d8f6 e4f6 h6g5 f6h7
+[luPI1SBu] AI thinking...
+[luPI1SBu] Attempting move: g5h6 (attempt 1)
+[luPI1SBu] Move successful: g5h6
+[luPI1SBu] Last move: g5h6
+[luPI1SBu] Bot color: black, turn: white, isMyTurn=false, fen=unavailable
+[luPI1SBu] Last move: d7c8
+[luPI1SBu] Bot color: black, turn: black, isMyTurn=true, fen=unavailable
+[luPI1SBu] It's our turn! Position: e2e4 e7e5 g1f3 g8f6 f3e5 f8c5 d2d4 b8c6 d4c5 c6e5 d1d6 c7d6 c5d6 e8g8 c1f4 e5g6 f1a6 g6f4 e1g1 a8b8 e4e5 b8a8 e5f6 g8h8 f6g7 h8g8 g7f8q g8f8 g2g3 f8g7 g3f4 g7f8 a6c4 f8g7 c4d5 g7f8 b1c3 f8g7 f4f5 g7f8 f1e1 a8b8 d5c6 b8a8 e1e7 f8g7 e7f7 g7h6 c6d7 h6g5 c3e4 g5h6 c2c3 a8b8 f7f6 d8f6 e4f6 h6g5 f6h7 g5h6 d7c8
+[luPI1SBu] AI thinking...
+[luPI1SBu] AI chose illegal move locally: g5f6, trying again...
+[luPI1SBu] AI chose illegal move locally: g5h6, trying again...
+[luPI1SBu] AI chose illegal move locally: g5f6, trying again...
+[luPI1SBu] Falling back to legal move: b8c8
+[luPI1SBu] Fallback move successful: b8c8
+[luPI1SBu] Last move: b8c8
+[luPI1SBu] Bot color: black, turn: white, isMyTurn=false, fen=unavailable
+[luPI1SBu] Last move: h7f6
+[luPI1SBu] Bot color: black, turn: black, isMyTurn=true, fen=unavailable
+[luPI1SBu] It's our turn! Position: e2e4 e7e5 g1f3 g8f6 f3e5 f8c5 d2d4 b8c6 d4c5 c6e5 d1d6 c7d6 c5d6 e8g8 c1f4 e5g6 f1a6 g6f4 e1g1 a8b8 e4e5 b8a8 e5f6 g8h8 f6g7 h8g8 g7f8q g8f8 g2g3 f8g7 g3f4 g7f8 a6c4 f8g7 c4d5 g7f8 b1c3 f8g7 f4f5 g7f8 f1e1 a8b8 d5c6 b8a8 e1e7 f8g7 e7f7 g7h6 c6d7 h6g5 c3e4 g5h6 c2c3 a8b8 f7f6 d8f6 e4f6 h6g5 f6h7 g5h6 d7c8 b8c8 h7f6
+[luPI1SBu] AI thinking...
+[luPI1SBu] AI chose illegal move locally: g5f6, trying again...
+[luPI1SBu] AI chose illegal move locally: g5h6, trying again...
+[luPI1SBu] AI chose illegal move locally: g5f6, trying again...
+[luPI1SBu] Falling back to legal move: c8d8
+[luPI1SBu] Fallback move successful: c8d8
+[luPI1SBu] Last move: c8d8
+[luPI1SBu] Bot color: black, turn: white, isMyTurn=false, fen=unavailable
+[luPI1SBu] Last move: d6d7
+[luPI1SBu] Bot color: black, turn: black, isMyTurn=true, fen=unavailable
+[luPI1SBu] It's our turn! Position: e2e4 e7e5 g1f3 g8f6 f3e5 f8c5 d2d4 b8c6 d4c5 c6e5 d1d6 c7d6 c5d6 e8g8 c1f4 e5g6 f1a6 g6f4 e1g1 a8b8 e4e5 b8a8 e5f6 g8h8 f6g7 h8g8 g7f8q g8f8 g2g3 f8g7 g3f4 g7f8 a6c4 f8g7 c4d5 g7f8 b1c3 f8g7 f4f5 g7f8 f1e1 a8b8 d5c6 b8a8 e1e7 f8g7 e7f7 g7h6 c6d7 h6g5 c3e4 g5h6 c2c3 a8b8 f7f6 d8f6 e4f6 h6g5 f6h7 g5h6 d7c8 b8c8 h7f6 c8d8 d6d7
+[luPI1SBu] AI thinking...
+[luPI1SBu] Attempting move: d8d7 (attempt 1)
+[luPI1SBu] Move successful: d8d7
+[luPI1SBu] Last move: d8d7
+[luPI1SBu] Bot color: black, turn: white, isMyTurn=false, fen=unavailable
