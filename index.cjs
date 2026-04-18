@@ -715,11 +715,9 @@ Last rejected move: ${lastRejectedMove || 'none'}.
 Failure feedback from previous attempt: ${correctionFeedback || 'none'}.
 
 Choose exactly one move copied from the Legal UCI moves line.
-The answer must match this pattern: file-rank-file-rank, for example e2e4. Do not answer in SAN.
-Choose the move that gives ${side} the best practical position.
 Return only the UCI string.`;
     const messages = [
-      { role: 'system', content: 'You choose chess moves only from an explicit legal move list. You may reason privately, but your final visible answer must be one UCI move and nothing else.' },
+      { role: 'system', content: `You are a chess master that is playing chess on lichess as side ${side}. You will be presented with the state of the chess board and a list of legal moves. Choose need to choose 1 move from that explicit legal move list. You may reason privately, but your final visible answer must be one UCI move and nothing else. The answer must match this pattern: file-rank-file-rank, for example e2e4.` },
       { role: 'user', content: prompt }
     ];
     
