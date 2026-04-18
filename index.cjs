@@ -485,6 +485,31 @@ class LichessBot {
     return rows.join('\n');
   }
 
+  boardToAscii(chess) {
+    const files = ['a', 'b', 'c', 'd', 'e', 'f', 'g', 'h'];
+    const pieceSymbols = {
+      'wK': '♔', 'wQ': '♕', 'wR': '♖', 'wB': '♗', 'wN': '♘', 'wp': '♙',
+      'bK': '♚', 'bQ': '♛', 'bR': '♜', 'bB': '♝', 'bN': '♞', 'bp': '♟'
+    };
+
+    let board = '  +---+---+---+---+---+---+---+---+\n';
+
+    for (let rank = 8; rank >= 1; rank--) {
+      board += `${rank} |`;
+      for (const file of files) {
+        const square = `${file}${rank}`;
+        const piece = chess.get(square);
+        const symbol = piece ? pieceSymbols[piece.color + piece.type.toUpperCase()] || '?' : ' ';
+        board += ` ${symbol} |`;
+      }
+      board += ` ${rank}\n`;
+      board += '  +---+---+---+---+---+---+---+---+\n';
+    }
+
+    board += '    a   b   c   d   e   f   g   h\n';
+    return board;
+  }
+
   getLastOpponentMove(position, myColor) {
     const moves = String(position || '').trim().split(/\s+/).filter(Boolean);
     if (!moves.length) return 'none';
@@ -700,10 +725,15 @@ class LichessBot {
     const side = myColor || 'the side to move';
     const sideBit = side === 'white' ? '1' : side === 'black' ? '0' : '?';
     const legalMoveMenu = this.formatLegalMoveMenu(legalMoves);
+    const currentChess = this.buildChess(position, fen);
+    const boardAscii = this.boardToAscii(currentChess);
     const prompt = `You are ${side} to move.
 
 FEN: ${fen}
 side_to_move: ${sideBit} (${side})
+
+Board:
+${boardAscii}
 
 Last opponent move (UCI): ${lastOpponentMove}.
 
