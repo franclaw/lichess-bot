@@ -9,7 +9,7 @@ services:
       LICHESS_TOKEN: ${LICHESS_TOKEN:-}
       BOT_USERNAME: ${BOT_USERNAME:-boscodebot}
       AI_ENDPOINT: ${AI_ENDPOINT:-http://host.docker.internal:1234/v1}
-      AI_MODEL: ${AI_MODEL:-qwen/qwen3-coder-next}
+      AI_MODEL: ${AI_MODEL:-}
       AI_TEMPERATURE: ${AI_TEMPERATURE:-1}
       REASONING_EFFORT: ${REASONING_EFFORT:-medium}
       REASONING_TOKENS: ${REASONING_TOKENS:-408}

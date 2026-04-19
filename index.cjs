@@ -24,10 +24,12 @@ class LichessBot {
   }
 
   async init() {
+    // Fetch free models from OpenRouter at startup
+    this.freeModelList = await this.fetchFreeModelsList();
     const runtimeConfig = this.loadRuntimeConfig();
     console.log('Initializing bot...');
     console.log(`AI Endpoint: ${runtimeConfig.aiEndpoint}`);
-    console.log(`AI model for new games: ${runtimeConfig.model}`);
+    console.log(`AI model for new games: ${runtimeConfig.randomModel}`);
     console.log(`My username: ${this.myBotUsername}\n`);
 
     const gameIds = process.argv.slice(2).filter(Boolean);
@@ -192,7 +194,7 @@ class LichessBot {
 
     const runtimeConfig = this.getOrCreateGameRuntimeConfig(gameId);
     this.gameRuntimeConfig.set(gameId, runtimeConfig);
-    console.log(`[${gameId}] Runtime config locked: model=${runtimeConfig.model}, endpoint=${runtimeConfig.aiEndpoint}, temperature=${runtimeConfig.temperature}, reasoning_effort=${runtimeConfig.reasoningEffort}, reasoning_tokens=${runtimeConfig.reasoningTokens}, max_tokens=${runtimeConfig.maxTokens}`);
+    console.log(`[${gameId}] Runtime config locked: model=${runtimeConfig.randomModel}, endpoint=${runtimeConfig.aiEndpoint}, temperature=${runtimeConfig.temperature}, reasoning_effort=${runtimeConfig.reasoningEffort}, reasoning_tokens=${runtimeConfig.reasoningTokens}, max_tokens=${runtimeConfig.maxTokens}`);
 
     console.log(`=== Watching game: ${gameId} ===`);
     const promise = this.watchGame(gameInfo)
@@ -243,17 +245,52 @@ class LichessBot {
     return fallback;
   }
 
+  async fetchFreeModelsList() {
+    const key = this.getRuntimeEnvValue(this.parseEnvFile(), 'AI_API_KEY', '');
+    try {
+      const response = await fetch('https://openrouter.ai/api/v1/models', {
+        headers: { 'Authorization': `Bearer ${key}` }
+      });
+      if (!response.ok) return null;
+      const data = await response.json();
+      const freeModels = data.data
+        .filter(m => m.pricing?.prompt === '0' && m.pricing?.completion === '0' && m.context_length > 1000)
+        .map(m => m.id);
+      console.log(`Loaded ${freeModels.length} free models from OpenRouter`);
+      return freeModels;
+    } catch (err) {
+      console.error('Failed to fetch free models:', err.message);
+      return null;
+    }
+  }
+
   loadRuntimeConfig() {
     const envFile = this.parseEnvFile();
+    const endpoint = this.getRuntimeEnvValue(envFile, 'AI_ENDPOINT', config.aiEndpoint);
+    const modelExplicitlySet = Object.prototype.hasOwnProperty.call(envFile, 'AI_MODEL') && envFile.AI_MODEL !== '';
+    const modelFromEnv = this.getRuntimeEnvValue(envFile, 'AI_MODEL', config.model);
+    const key = this.getRuntimeEnvValue(envFile, 'AI_API_KEY', '');
+
+    let randomModel;
+    if (modelExplicitlySet) {
+      randomModel = modelFromEnv;
+    } else if (this.freeModelList && this.freeModelList.length > 0) {
+      randomModel = this.freeModelList[Math.floor(Math.random() * this.freeModelList.length)];
+    } else {
+      randomModel = 'openai/gpt-oss-120b';
+    }
 
     return {
-      aiEndpoint: this.getRuntimeEnvValue(envFile, 'AI_ENDPOINT', config.aiEndpoint),
-      model: this.getRuntimeEnvValue(envFile, 'AI_MODEL', config.model || ''),
+      aiEndpoint: endpoint,
+      model: modelFromEnv,
       temperature: this.parseRuntimeNumber(this.getRuntimeEnvValue(envFile, 'AI_TEMPERATURE', '1'), 1),
       reasoningEffort: this.getRuntimeEnvValue(envFile, 'REASONING_EFFORT', 'medium'),
       reasoningTokens: this.parseRuntimeNumber(this.getRuntimeEnvValue(envFile, 'REASONING_TOKENS', '408'), 408),
       maxTokens: this.parseRuntimeNumber(this.getRuntimeEnvValue(envFile, 'MAX_TOKENS', '512'), 512),
-      feedbackRetries: this.parseRuntimeNumber(this.getRuntimeEnvValue(envFile, 'AI_FEEDBACK_RETRIES', '4'), 4)
+      feedbackRetries: this.parseRuntimeNumber(this.getRuntimeEnvValue(envFile, 'AI_FEEDBACK_RETRIES', '4'), 4),
+      apiKey: key,
+      // Randomly select a free model if no specific model is configured
+      randomModel
     };
   }
 
@@ -327,7 +364,7 @@ class LichessBot {
     await this.sendChatLog(
       gameId,
       'model',
-      `${runtimeConfig.model}; temp=${runtimeConfig.temperature}; effort=${runtimeConfig.reasoningEffort}; reasoning_tokens=${runtimeConfig.reasoningTokens}; max_tokens=${runtimeConfig.maxTokens}`
+      `${runtimeConfig.randomModel}; temp=${runtimeConfig.temperature}; effort=${runtimeConfig.reasoningEffort}; reasoning_tokens=${runtimeConfig.reasoningTokens}; max_tokens=${runtimeConfig.maxTokens}`
     );
 
   }
@@ -722,25 +759,54 @@ Return only the UCI string.`;
     ];
     
     try {
-      const response = await fetch(`${runtimeConfig.aiEndpoint}/chat/completions`, {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({
-          model: runtimeConfig.model,
-          messages,
-          temperature: runtimeConfig.temperature,
-          reasoning_effort: runtimeConfig.reasoningEffort,
-          reasoning_tokens: runtimeConfig.reasoningTokens,
-          max_tokens: runtimeConfig.maxTokens
-        })
-      });
+      const headers = { 'Content-Type': 'application/json' };
+      if (runtimeConfig.apiKey) {
+        headers['Authorization'] = `Bearer ${runtimeConfig.apiKey}`;
+      }
 
-      if (response.status === 429) {
-        console.error(`[RATE LIMIT] AI request got HTTP 429; retry-after=${response.headers.get('retry-after') || 'not provided'}`);
+      // Retry with exponential backoff for transient errors (503, 429, etc.)
+      let lastError;
+      let response;
+      for (let attempt = 0; attempt < 3; attempt++) {
+        response = await fetch(`${runtimeConfig.aiEndpoint}/chat/completions`, {
+          method: 'POST',
+          headers,
+          body: JSON.stringify({
+            model: runtimeConfig.randomModel,
+            messages,
+            temperature: runtimeConfig.temperature,
+            reasoning_effort: runtimeConfig.reasoningEffort,
+            reasoning_tokens: runtimeConfig.reasoningTokens,
+            max_tokens: runtimeConfig.maxTokens
+          })
+        });
+
+        if (response.status === 429) {
+          const retryAfter = response.headers.get('retry-after');
+          console.error(`[RATE LIMIT] AI request got HTTP 429; retry-after=${retryAfter || 'not provided'}`);
+          if (retryAfter) {
+            await this.sleep(Number(retryAfter) * 1000);
+            continue;
+          }
+        }
+
+        if (response.status === 503) {
+          const delay = (attempt + 1) * 2000;
+          console.error(`[503] Service unavailable, retrying in ${delay}ms...`);
+          await this.sleep(delay);
+          continue;
+        }
+
+        if (!response.ok) {
+          throw new Error(`AI API error: ${response.status}`);
+        }
+
+        // Success - break out of retry loop
+        break;
       }
 
       if (!response.ok) throw new Error(`AI API error: ${response.status}`);
-      
+
       const data = await response.json();
       const content = data.choices?.[0]?.message?.content || '';
       return {
