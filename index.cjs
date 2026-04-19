@@ -102,7 +102,12 @@ class LichessBot {
 
   async fetchStream(url, options = {}) {
     const response = await fetch(url, { ...options, headers: this.headers });
-    
+
+    if (response.status === 400) {
+      console.error(`[HTTP 400] Stream error for ${url}; body=${await response.text().catch(() => '<empty>')}`);
+      console.error(`[HTTP 400] Headers: ${JSON.stringify(this.headers)}`);
+    }
+
     if (response.status === 429) {
       console.error(`[RATE LIMIT] Stream request got HTTP 429 for ${url}; retry-after=${response.headers.get('retry-after') || 'not provided'}`);
     }
@@ -881,6 +886,11 @@ Return only the UCI string.`;
           continue;
         }
 
+        if (response.status === 400) {
+          const errorText = await response.text().catch(() => 'no body');
+          console.error(`[${gameId}] AI request HTTP 400; body=${errorText}; endpoint=${runtimeConfig.aiEndpoint}; model=${runtimeConfig.randomModel}`);
+        }
+
         if (!response.ok) {
           const errorText = await response.text().catch(() => 'no body');
           console.error(`[${gameId}] AI request error status=${response.status} body=${errorText}`);
@@ -988,7 +998,12 @@ Return only the UCI string.`;
   async fetch(url, options = {}) {
     const response = await fetch(url, { ...options, headers: this.headers });
     const text = await response.text();
-    
+
+    if (response.status === 400) {
+      console.error(`[HTTP 400] Lichess API error for ${url}; body=${text || '<empty>'}`);
+      console.error(`[HTTP 400] Headers: ${JSON.stringify(this.headers)}`);
+    }
+
     if (response.status === 429) {
       console.error(`[RATE LIMIT] Lichess API request got HTTP 429 for ${url}; retry-after=${response.headers.get('retry-after') || 'not provided'}; body=${text || '<empty>'}`);
     }
