@@ -738,6 +738,7 @@ class LichessBot {
     }
 
     console.log(`[${gameId}] Falling back to legal move: ${fallbackMove}`);
+    await this.sendChatMessage(gameId, 'player', `fallback: ${fallbackMove}`);
     try {
       await this.fetch(`${this.apiBase}/bot/game/${gameId}/move/${fallbackMove}`, { method: 'POST' });
       console.log(`[${gameId}] Fallback move successful: ${fallbackMove}`);
