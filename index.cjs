@@ -681,8 +681,9 @@ class LichessBot {
           lastRejectedMove
         );
       } catch (err) {
-        // Persistent technical error (API down, network error, etc.)
-        // Handled separately from move-quality retries.
+        const errorType = err.message.includes('429') ? 'rate_limit' : err.message.includes('HTTP 5') ? 'server_error' : err.message.includes('timeout') ? 'timeout' : 'api_error';
+        const retryCount = attempt;
+        await this.sendChatMessage(gameId, 'player', `AI error: ${errorType}, retries: ${retryCount}`);
         console.error(`[${gameId}] Persistent AI API failure: ${err.message}. Falling back to local move.`);
         break; // Exit the loop and use fallback logic
       }
@@ -845,6 +846,13 @@ Return only the UCI string.`;
       let response;
       let data;
       for (let attempt = 0; attempt < 5; attempt++) {
+        const reasoning = { enabled: true };
+        if (runtimeConfig.reasoningEffort) {
+          reasoning.effort = runtimeConfig.reasoningEffort;
+        } else if (runtimeConfig.reasoningTokens) {
+          reasoning.max_tokens = runtimeConfig.reasoningTokens;
+        }
+
         response = await fetch(`${runtimeConfig.aiEndpoint}/chat/completions`, {
           method: 'POST',
           headers,
@@ -852,9 +860,8 @@ Return only the UCI string.`;
             model: runtimeConfig.randomModel,
             messages,
             temperature: runtimeConfig.temperature,
-            reasoning_effort: runtimeConfig.reasoningEffort,
-            reasoning_tokens: runtimeConfig.reasoningTokens,
-            max_tokens: runtimeConfig.maxTokens
+            max_tokens: runtimeConfig.maxTokens,
+            reasoning
           })
         });
 
@@ -894,8 +901,8 @@ Return only the UCI string.`;
 
         if (data.error) {
           console.error(`[${gameId}] AI provider returned error in 200 OK response:`, JSON.stringify(data.error));
-          // If it looks like a transient error (like 524 timeout), retry
-          if (data.error.code === 524 || data.error.code === 429 || data.error.message?.includes('timeout')) {
+          // If it looks like a transient error (like 524/502 timeout), retry
+          if (data.error.code === 524 || data.error.code === 502 || data.error.code === 429 || data.error.message?.includes('timeout')) {
             const delay = (attempt + 1) * 2000;
             console.log(`[${gameId}] Transient provider error detected, retrying in ${delay}ms (attempt ${attempt + 1}/5)...`);
             await this.sleep(delay);
