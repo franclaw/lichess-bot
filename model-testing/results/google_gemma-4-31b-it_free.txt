@@ -1,0 +1,39 @@
+Model: google/gemma-4-31b-it:free
+================================================================================
+
+VARIANT 1: Show me your chess knowledge: show 3 board positions and moves where the move choice is trivial.
+----------------------------------------
+Error: Failed to get response after retries for google/gemma-4-31b-it:free
+
+VARIANT 2: Can you provide 3 examples of chess positions where there is only one logical or winning move? Explain why.
+----------------------------------------
+Error: Failed to get response after retries for google/gemma-4-31b-it:free
+
+VARIANT 3: Describe 3 simple chess tactical or positional scenarios where the best move is absolutely obvious even to a beginner.
+----------------------------------------
+To a beginner, "obvious" moves usually fall into three categories: **direct captures of high-value pieces**, **immediate threats to the King**, and **simple forced wins**.
+
+Here are three scenarios where the best move is unmistakable.
+
+### 1. The "Hanging" Queen (Material Gain)
+**The Scenario:** You are playing a game, and your opponent makes a move that leaves their Queen unprotected. Your Bishop or Knight is currently positioned in a way that it can capture the Queen, and there are no pieces defending that square.
+
+*   **The Setup:** White has a Bishop on c4. Black moves their Queen to f7, which is an empty square not defended by any other black piece.
+*   **The Move:** **Bxf7 (Bishop takes Queen).**
+*   **Why it’s obvious:** In chess, the Queen is the most powerful piece. When a piece is "hanging" (unprotected) and can be taken for free, it is almost always the best move. A beginner recognizes the massive imbalance in power and takes the free material immediately.
+
+### 2. The "Mate in One" (The Immediate Win)
+**The Scenario:** Your opponent's King is trapped in a corner or on the edge of the board. You have a piece (usually a Queen or Rook) that can move to a square where it directly attacks the King, and the King has no legal squares to move to, and no piece can capture your attacking piece.
+
+*   **The Setup:** The Black King is on g8, blocked in by its own pawns on f7, g7, and h7. You have a Queen on d1.
+*   **The Move:** **Qg4# or Qh5# (Moving the Queen to a square that checks the King).**
+*   **Why it’s obvious:** The ultimate goal of chess is checkmate. When a player sees a move that ends the game instantly, all other strategic considerations (like positioning or pawn structure) vanish. The "win" signal is the strongest trigger in the game.
+
+### 3. The "Forced Trade" to Simplify (The Winning Endgame)
+**The Scenario:** You are significantly "up" in material (for example, you have a Rook and a Queen, while your opponent only has a Queen). Your opponent’s Queen is the only piece keeping them in the game. You have an opportunity to trade your Queen for theirs.
+
+*   **The Setup:** You have a Queen on d4 and a Rook on e1. Your opponent has a Queen on d5. 
+*   **The Move:** **Qxd5 (Queen takes Queen).**
+*   **Why it’s obvious:** While beginners are often afraid to give up their Queen, a basic understanding of "trading down" makes this clear: if you remove the only piece your opponent has that can create threats, you are left with a Rook against nothing. The path to victory becomes a simple matter of escorting a pawn to the end of the board.
+
+================================================================================

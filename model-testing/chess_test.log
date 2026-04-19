@@ -1,0 +1,41 @@
+Starting script main...
+Fetching models from OpenRouter...
+Found 26 free models.
+Skipping already processed model: openrouter/elephant-alpha
+Skipping already processed model: google/gemma-4-26b-a4b-it:free
+Querying model: google/gemma-4-31b-it:free -> results/google_gemma-4-31b-it_free.txt
+Retrying in 15s due to status 429 (attempt 1/6)
+Retrying in 30s due to status 429 (attempt 2/6)
+Retrying in 60s due to status 429 (attempt 3/6)
+Retrying in 120s due to status 429 (attempt 4/6)
+Retrying in 240s due to status 429 (attempt 5/6)
+Retrying in 480s due to status 429 (attempt 6/6)
+Retrying in 15s due to status 429 (attempt 1/6)
+Retrying in 30s due to status 429 (attempt 2/6)
+Retrying in 60s due to status 429 (attempt 3/6)
+Retrying in 120s due to status 429 (attempt 4/6)
+Retrying in 240s due to status 429 (attempt 5/6)
+Retrying in 480s due to status 429 (attempt 6/6)
+Retrying in 15s due to status 429 (attempt 1/6)
+Retrying in 30s due to status 429 (attempt 2/6)
+Retrying in 60s due to status 429 (attempt 3/6)
+Querying model: nvidia/nemotron-3-super-120b-a12b:free -> results/nvidia_nemotron-3-super-120b-a12b_free.txt
+Querying model: minimax/minimax-m2.5:free -> results/minimax_minimax-m2.5_free.txt
+Skipping already processed model: openrouter/free
+Skipping already processed model: arcee-ai/trinity-large-preview:free
+Skipping already processed model: liquid/lfm-2.5-1.2b-thinking:free
+Skipping already processed model: liquid/lfm-2.5-1.2b-instruct:free
+Skipping already processed model: nvidia/nemotron-3-nano-30b-a3b:free
+Querying model: nvidia/nemotron-nano-12b-v2-vl:free -> results/nvidia_nemotron-nano-12b-v2-vl_free.txt
+Querying model: qwen/qwen3-next-80b-a3b-instruct:free -> results/qwen_qwen3-next-80b-a3b-instruct_free.txt
+Retrying in 15s due to status 429 (attempt 1/6)
+Retrying in 30s due to status 429 (attempt 2/6)
+Retrying in 60s due to status 429 (attempt 3/6)
+Retrying in 120s due to status 429 (attempt 4/6)
+Retrying in 240s due to status 429 (attempt 5/6)
+Retrying in 480s due to status 429 (attempt 6/6)
+Retrying in 15s due to status 429 (attempt 1/6)
+Retrying in 30s due to status 429 (attempt 2/6)
+Retrying in 60s due to status 429 (attempt 3/6)
+Retrying in 120s due to status 429 (attempt 4/6)
+Retrying in 240s due to status 429 (attempt 5/6)

@@ -277,7 +277,7 @@ class LichessBot {
     } else if (this.freeModelList && this.freeModelList.length > 0) {
       randomModel = this.freeModelList[Math.floor(Math.random() * this.freeModelList.length)];
     } else {
-      randomModel = 'openai/gpt-oss-120b';
+	  throw new Error('modelExplicitlySet false and free model selection failed.');
     }
 
     return {
@@ -664,9 +664,11 @@ class LichessBot {
     let correctionFeedback = '';
     let lastRejectedMove = '';
 
-    for (let attempt = 1; attempt <= maxAttempts; attempt++) {
+    let attempt = 1;
+    while (attempt <= maxAttempts) {
+      let result;
       try {
-        const result = await this.getAIMove(
+        result = await this.getAIMove(
           gameId,
           position.trim(),
           currentFen,
@@ -678,41 +680,48 @@ class LichessBot {
           correctionFeedback,
           lastRejectedMove
         );
-        const move = result.move;
-        const rawResponse = (result.content || '').trim() || '<empty>';
-        
-        if (!move || !/^[a-h][1-8][a-h][1-8][qrbn]?$/.test(move)) {
-          console.log(`[${gameId}] Invalid move format on attempt ${attempt}/${maxAttempts}: ${move || '<none>'}`);
-          correctionFeedback = `Your previous answer "${rawResponse}" did not provide exactly one legal UCI move. Reply with only one UCI move from the legal move list. Legal UCI moves again: ${legalMoveMenu}`;
-          lastRejectedMove = move || '';
-          if (move) invalidMoves.push(move);
-          continue;
-        }
-
-        if (!this.isLegalMove(position, fen, myColor, move)) {
-          console.log(`[${gameId}] AI chose illegal move locally on attempt ${attempt}/${maxAttempts}: ${move}`);
-          correctionFeedback = `Your previous move "${move}" is illegal in this position. Choose a different move from the legal move list. Legal UCI moves again: ${legalMoveMenu}`;
-          lastRejectedMove = move;
-          invalidMoves.push(move);
-          continue;
-        }
-        
-        console.log(`[${gameId}] Attempting move: ${move} (attempt ${attempt}/${maxAttempts})`);
-        
-        try {
-          await this.fetch(`${this.apiBase}/bot/game/${gameId}/move/${move}`, { method: 'POST' });
-          console.log(`[${gameId}] Move successful: ${move}`);
-          return { resync: false };
-        } catch (err) {
-          if (err.message.includes('400')) {
-            console.log(`[${gameId}] Lichess rejected locally-legal move ${move} with HTTP 400; requesting stream resync`);
-            return { resync: true };
-          }
-          throw err;
-        }
       } catch (err) {
-        console.error(`[${gameId}] AI error:`, err.message);
+        // Persistent technical error (API down, network error, etc.)
+        // Handled separately from move-quality retries.
+        console.error(`[${gameId}] Persistent AI API failure: ${err.message}. Falling back to local move.`);
+        break; // Exit the loop and use fallback logic
+      }
+
+      const move = result.move;
+      const rawResponse = (result.content || "").trim() || "<empty>";
+      
+      if (!move || !/^[a-h][1-8][a-h][1-8][qrbn]?$/.test(move)) {
+        console.log(`[${gameId}] Invalid move format on attempt ${attempt}/${maxAttempts}: ${move || "<none>"} (Raw response: "${rawResponse}")`);
+        correctionFeedback = `Your previous answer "${rawResponse}" did not provide exactly one legal UCI move. Reply with only one UCI move from the legal move list. Legal UCI moves again: ${legalMoveMenu}`;
+        lastRejectedMove = move || "";
+        if (move) invalidMoves.push(move);
+        attempt++; // Logical attempt consumed
+        continue;
+      }
+
+      if (!this.isLegalMove(position, fen, myColor, move)) {
+        console.log(`[${gameId}] AI chose illegal move locally on attempt ${attempt}/${maxAttempts}: ${move}`);
+        correctionFeedback = `Your previous move "${move}" is illegal in this position. Choose a different move from the legal move list. Legal UCI moves again: ${legalMoveMenu}`;
+        lastRejectedMove = move;
+        invalidMoves.push(move);
+        attempt++; // Logical attempt consumed
+        continue;
+      }
+      
+      console.log(`[${gameId}] Attempting move: ${move} (attempt ${attempt}/${maxAttempts})`);
+      
+      try {
+        await this.fetch(`${this.apiBase}/bot/game/${gameId}/move/${move}`, { method: 'POST' });
+        console.log(`[${gameId}] Move successful: ${move}`);
         return { resync: false };
+      } catch (err) {
+        if (err.message.includes('400')) {
+          console.log(`[${gameId}] Lichess rejected locally-legal move ${move} with HTTP 400; requesting stream resync`);
+          return { resync: true };
+        }
+        // Other HTTP errors (e.g. 500) from Lichess are also treated as technical failures
+        console.error(`[${gameId}] Lichess move submission failed:`, err.message);
+        break; 
       }
     }
     
@@ -733,14 +742,81 @@ class LichessBot {
     }
   }
 
+  generateAsciiBoard(chess) {
+    const ascii = chess.ascii();
+    // chess.js ascii() looks like:
+    //   +-------------------------------+
+    // 8 | r  n  b  q  k  b  n  r |
+    // 7 | p  p  p  p  .  p  p  p |
+    // ...
+    //   +-------------------------------+
+    //     a  b  c  d  e  f  g  h
+    
+    // We want to clean it up a bit to match the user's requested format
+    const lines = ascii.split('\n');
+    const boardLines = lines.slice(1, 9).map(line => {
+      // line is like "8 | r  n  b  q  k  b  n  r |"
+      // Remove trailing "|" and extra spaces
+      return line.replace(/\s*\|\s*$/, '').replace(/\s+/g, ' ');
+    });
+    return boardLines.join('\n') + '\n    a b c d e f g h';
+  }
+
+  generatePieceList(chess, color) {
+    const pieces = {
+      'King': [],
+      'Queen': [],
+      'Rooks': [],
+      'Bishops': [],
+      'Knights': [],
+      'Pawns': []
+    };
+
+    const nameMap = {
+      'k': 'King',
+      'q': 'Queen',
+      'r': 'Rooks',
+      'b': 'Bishops',
+      'n': 'Knights',
+      'p': 'Pawns'
+    };
+
+    for (let r = 0; r < 8; r++) {
+      for (let c = 0; c < 8; c++) {
+        const square = String.fromCharCode(97 + c) + (8 - r);
+        const piece = chess.get(square);
+        if (piece && piece.color === color) {
+          pieces[nameMap[piece.type]].push(square);
+        }
+      }
+    }
+
+    return Object.entries(pieces)
+      .filter(([_, squares]) => squares.length > 0)
+      .map(([name, squares]) => `${name}: ${squares.join(', ')}`)
+      .join('\n');
+  }
+
   async getAIMove(gameId, position, fen, lastOpponentMove, myColor, invalidMoves = [], legalMoves = [], runtimeConfig = this.loadRuntimeConfig(), correctionFeedback = '', lastRejectedMove = '') {
     const side = myColor || 'the side to move';
-    const sideBit = side === 'white' ? '1' : side === 'black' ? '0' : '?';
+    const sideName = side.charAt(0).toUpperCase() + side.slice(1);
+    const chess = this.buildChess(position, fen);
+    const asciiBoard = this.generateAsciiBoard(chess);
+    const whitePieces = this.generatePieceList(chess, 'w');
+    const blackPieces = this.generatePieceList(chess, 'b');
+    
     const legalMoveMenu = this.formatLegalMoveMenu(legalMoves);
-    const prompt = `You are ${side} to move.
+    const prompt = `FEN: ${fen}
 
-FEN: ${fen}
-side_to_move: ${sideBit} (${side})
+Side to move: ${sideName}
+Board:
+${asciiBoard}
+
+White pieces:
+${whitePieces}
+
+Black pieces:
+${blackPieces}
 
 Last opponent move (UCI): ${lastOpponentMove}.
 
@@ -767,7 +843,8 @@ Return only the UCI string.`;
       // Retry with exponential backoff for transient errors (503, 429, etc.)
       let lastError;
       let response;
-      for (let attempt = 0; attempt < 3; attempt++) {
+      let data;
+      for (let attempt = 0; attempt < 5; attempt++) {
         response = await fetch(`${runtimeConfig.aiEndpoint}/chat/completions`, {
           method: 'POST',
           headers,
@@ -790,25 +867,56 @@ Return only the UCI string.`;
           }
         }
 
-        if (response.status === 503) {
+        if (response.status >= 500) {
           const delay = (attempt + 1) * 2000;
-          console.error(`[503] Service unavailable, retrying in ${delay}ms...`);
+          console.error(`[${response.status}] AI service error, retrying in ${delay}ms (attempt ${attempt + 1}/5)...`);
           await this.sleep(delay);
           continue;
         }
 
         if (!response.ok) {
+          const errorText = await response.text().catch(() => 'no body');
+          console.error(`[${gameId}] AI request error status=${response.status} body=${errorText}`);
           throw new Error(`AI API error: ${response.status}`);
+        }
+
+        // Status is 200 OK, but we must check if the body contains a provider error
+        const text = await response.text();
+        try {
+          data = JSON.parse(text);
+        } catch (err) {
+          console.error(`[${gameId}] AI response not JSON. Raw: "${text}"`);
+          const delay = (attempt + 1) * 2000;
+          console.log(`[${gameId}] Retrying in ${delay}ms...`);
+          await this.sleep(delay);
+          continue;
+        }
+
+        if (data.error) {
+          console.error(`[${gameId}] AI provider returned error in 200 OK response:`, JSON.stringify(data.error));
+          // If it looks like a transient error (like 524 timeout), retry
+          if (data.error.code === 524 || data.error.code === 429 || data.error.message?.includes('timeout')) {
+            const delay = (attempt + 1) * 2000;
+            console.log(`[${gameId}] Transient provider error detected, retrying in ${delay}ms (attempt ${attempt + 1}/5)...`);
+            await this.sleep(delay);
+            continue;
+          }
+          throw new Error(`AI provider error: ${data.error.message || data.error.code || 'unknown'}`);
         }
 
         // Success - break out of retry loop
         break;
       }
 
-      if (!response.ok) throw new Error(`AI API error: ${response.status}`);
+      if (!response.ok || (data && data.error)) {
+        throw new Error(`AI API error after retries`);
+      }
 
-      const data = await response.json();
-      const content = data.choices?.[0]?.message?.content || '';
+      if (!data || !data.choices || data.choices.length === 0) {
+        console.error(`[${gameId}] AI response missing choices:`, JSON.stringify(data));
+        throw new Error('AI response missing choices');
+      }
+      const content = data.choices[0].message?.content || '';
       return {
         move: this.parseMove(content, legalMoves),
         content,
@@ -818,8 +926,8 @@ Return only the UCI string.`;
         ]
       };
     } catch (err) {
-      console.error('AI request failed:', err.message);
-      return { move: null, content: '', messages };
+      console.error(`[${gameId}] AI request failed:`, err.message);
+      throw err;
     }
   }
 
