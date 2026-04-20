@@ -659,18 +659,18 @@ class LichessBot {
     const currentFen = currentChess.fen();
     const lastOpponentMove = this.getLastOpponentMove(position, myColor);
     const legalMoves = this.getLegalMoveDetails(position, fen, myColor);
+    
     if (!legalMoves.length) {
       console.log(`[${gameId}] No legal moves available locally; skipping move`);
       return { resync: false };
     }
+
     const legalMoveMenu = this.formatLegalMoveMenu(legalMoves);
-    const maxFeedbackRetries = Math.max(0, Math.floor(runtimeConfig.feedbackRetries ?? 4));
-    const maxAttempts = 1 + maxFeedbackRetries;
     let correctionFeedback = '';
     let lastRejectedMove = '';
+    const retryDelayMs = 300000; // 5 minutes
 
-    let attempt = 1;
-    while (attempt <= maxAttempts) {
+    while (true) {
       let result;
       try {
         result = await this.getAIMove(
@@ -686,35 +686,36 @@ class LichessBot {
           lastRejectedMove
         );
       } catch (err) {
-        const errorType = err.message.includes('429') ? 'rate_limit' : err.message.includes('HTTP 5') ? 'server_error' : err.message.includes('timeout') ? 'timeout' : 'api_error';
-        const retryCount = attempt;
-        await this.sendChatMessage(gameId, 'player', `AI error: ${errorType}, retries: ${retryCount}`);
-        console.error(`[${gameId}] Persistent AI API failure: ${err.message}. Falling back to local move.`);
-        break; // Exit the loop and use fallback logic
+        console.error(`[${gameId}] AI API failure: ${err.message}. Retrying in 5m...`);
+        await this.sendChatMessage(gameId, 'player', `AI API error: ${err.message}. Retrying in 5m...`);
+        await this.sleep(retryDelayMs);
+        continue;
       }
 
       const move = result.move;
       const rawResponse = (result.content || "").trim() || "<empty>";
       
       if (!move || !/^[a-h][1-8][a-h][1-8][qrbn]?$/.test(move)) {
-        console.log(`[${gameId}] Invalid move format on attempt ${attempt}/${maxAttempts}: ${move || "<none>"} (Raw response: "${rawResponse}")`);
+        console.log(`[${gameId}] Invalid move format: ${move || "<none>"} (Raw response: "${rawResponse}"). Retrying in 5m...`);
         correctionFeedback = `Your previous answer "${rawResponse}" did not provide exactly one legal UCI move. Reply with only one UCI move from the legal move list. Legal UCI moves again: ${legalMoveMenu}`;
         lastRejectedMove = move || "";
         if (move) invalidMoves.push(move);
-        attempt++; // Logical attempt consumed
+        await this.sendChatMessage(gameId, 'player', `AI format error. Retrying in 5m...`);
+        await this.sleep(retryDelayMs);
         continue;
       }
 
       if (!this.isLegalMove(position, fen, myColor, move)) {
-        console.log(`[${gameId}] AI chose illegal move locally on attempt ${attempt}/${maxAttempts}: ${move}`);
+        console.log(`[${gameId}] AI chose illegal move: ${move}. Retrying in 5m...`);
         correctionFeedback = `Your previous move "${move}" is illegal in this position. Choose a different move from the legal move list. Legal UCI moves again: ${legalMoveMenu}`;
         lastRejectedMove = move;
         invalidMoves.push(move);
-        attempt++; // Logical attempt consumed
+        await this.sendChatMessage(gameId, 'player', `AI illegal move: ${move}. Retrying in 5m...`);
+        await this.sleep(retryDelayMs);
         continue;
       }
       
-      console.log(`[${gameId}] Attempting move: ${move} (attempt ${attempt}/${maxAttempts})`);
+      console.log(`[${gameId}] Attempting move: ${move}`);
       
       try {
         await this.fetch(`${this.apiBase}/bot/game/${gameId}/move/${move}`, { method: 'POST' });
@@ -725,27 +726,10 @@ class LichessBot {
           console.log(`[${gameId}] Lichess rejected locally-legal move ${move} with HTTP 400; requesting stream resync`);
           return { resync: true };
         }
-        // Other HTTP errors (e.g. 500) from Lichess are also treated as technical failures
-        console.error(`[${gameId}] Lichess move submission failed:`, err.message);
-        break; 
+        console.error(`[${gameId}] Lichess move submission failed: ${err.message}. Retrying in 5m...`);
+        await this.sendChatMessage(gameId, 'player', `Lichess error: ${err.message}. Retrying in 5m...`);
+        await this.sleep(retryDelayMs);
       }
-    }
-    
-    const fallbackMove = this.getFallbackMove(position, fen, myColor, invalidMoves);
-    if (!fallbackMove) {
-      console.log(`[${gameId}] Failed to find a legal fallback move`);
-      return { resync: false };
-    }
-
-    console.log(`[${gameId}] Falling back to legal move: ${fallbackMove}`);
-    await this.sendChatMessage(gameId, 'player', `fallback: ${fallbackMove}`);
-    try {
-      await this.fetch(`${this.apiBase}/bot/game/${gameId}/move/${fallbackMove}`, { method: 'POST' });
-      console.log(`[${gameId}] Fallback move successful: ${fallbackMove}`);
-      return { resync: false };
-    } catch (err) {
-      console.error(`[${gameId}] Fallback move failed:`, err.message);
-      return { resync: false };
     }
   }
 
@@ -847,87 +831,43 @@ Return only the UCI string.`;
         headers['Authorization'] = `Bearer ${runtimeConfig.apiKey}`;
       }
 
-      // Retry with exponential backoff for transient errors (503, 429, etc.)
-      let lastError;
-      let response;
-      let data;
-      for (let attempt = 0; attempt < 5; attempt++) {
-        const reasoning = { enabled: true };
-        if (runtimeConfig.reasoningEffort) {
-          reasoning.effort = runtimeConfig.reasoningEffort;
-        } else if (runtimeConfig.reasoningTokens) {
-          reasoning.max_tokens = runtimeConfig.reasoningTokens;
-        }
-
-        response = await fetch(`${runtimeConfig.aiEndpoint}/chat/completions`, {
-          method: 'POST',
-          headers,
-          body: JSON.stringify({
-            model: runtimeConfig.randomModel,
-            messages,
-            temperature: runtimeConfig.temperature,
-            max_tokens: runtimeConfig.maxTokens,
-            reasoning
-          })
-        });
-
-        if (response.status === 429) {
-          const retryAfter = response.headers.get('retry-after');
-          console.error(`[RATE LIMIT] AI request got HTTP 429; retry-after=${retryAfter || 'not provided'}`);
-          if (retryAfter) {
-            await this.sleep(Number(retryAfter) * 1000);
-            continue;
-          }
-        }
-
-        if (response.status >= 500) {
-          const delay = (attempt + 1) * 2000;
-          console.error(`[${response.status}] AI service error, retrying in ${delay}ms (attempt ${attempt + 1}/5)...`);
-          await this.sleep(delay);
-          continue;
-        }
-
-        if (response.status === 400) {
-          const errorText = await response.text().catch(() => 'no body');
-          console.error(`[${gameId}] AI request HTTP 400; body=${errorText}; endpoint=${runtimeConfig.aiEndpoint}; model=${runtimeConfig.randomModel}`);
-        }
-
-        if (!response.ok) {
-          const errorText = await response.text().catch(() => 'no body');
-          console.error(`[${gameId}] AI request error status=${response.status} body=${errorText}`);
-          throw new Error(`AI API error: ${response.status}`);
-        }
-
-        // Status is 200 OK, but we must check if the body contains a provider error
-        const text = await response.text();
-        try {
-          data = JSON.parse(text);
-        } catch (err) {
-          console.error(`[${gameId}] AI response not JSON. Raw: "${text}"`);
-          const delay = (attempt + 1) * 2000;
-          console.log(`[${gameId}] Retrying in ${delay}ms...`);
-          await this.sleep(delay);
-          continue;
-        }
-
-        if (data.error) {
-          console.error(`[${gameId}] AI provider returned error in 200 OK response:`, JSON.stringify(data.error));
-          // If it looks like a transient error (like 524/502 timeout), retry
-          if (data.error.code === 524 || data.error.code === 502 || data.error.code === 429 || data.error.message?.includes('timeout')) {
-            const delay = (attempt + 1) * 2000;
-            console.log(`[${gameId}] Transient provider error detected, retrying in ${delay}ms (attempt ${attempt + 1}/5)...`);
-            await this.sleep(delay);
-            continue;
-          }
-          throw new Error(`AI provider error: ${data.error.message || data.error.code || 'unknown'}`);
-        }
-
-        // Success - break out of retry loop
-        break;
+      const reasoning = { enabled: true };
+      if (runtimeConfig.reasoningEffort) {
+        reasoning.effort = runtimeConfig.reasoningEffort;
+      } else if (runtimeConfig.reasoningTokens) {
+        reasoning.max_tokens = runtimeConfig.reasoningTokens;
       }
 
-      if (!response.ok || (data && data.error)) {
-        throw new Error(`AI API error after retries`);
+      const response = await fetch(`${runtimeConfig.aiEndpoint}/chat/completions`, {
+        method: 'POST',
+        headers,
+        body: JSON.stringify({
+          model: runtimeConfig.randomModel,
+          messages,
+          temperature: runtimeConfig.temperature,
+          max_tokens: runtimeConfig.maxTokens,
+          reasoning
+        })
+      });
+
+      if (!response.ok) {
+        const errorText = await response.text().catch(() => 'no body');
+        console.error(`[${gameId}] AI request error status=${response.status} body=${errorText}`);
+        throw new Error(`AI API error: ${response.status}`);
+      }
+
+      const text = await response.text();
+      let data;
+      try {
+        data = JSON.parse(text);
+      } catch (err) {
+        console.error(`[${gameId}] AI response not JSON. Raw: "${text}"`);
+        throw new Error('AI response not JSON');
+      }
+
+      if (data.error) {
+        console.error(`[${gameId}] AI provider returned error:`, JSON.stringify(data.error));
+        throw new Error(`AI provider error: ${data.error.message || data.error.code || 'unknown'}`);
       }
 
       if (!data || !data.choices || data.choices.length === 0) {

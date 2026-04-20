@@ -7,7 +7,7 @@ services:
     command: sh -c "npm ci && npm start"
     environment:
       LICHESS_TOKEN: ${LICHESS_TOKEN:-}
-      BOT_USERNAME: ${BOT_USERNAME:-boscodebot}
+      BOT_USERNAME: ${BOT_USERNAME:-franclaw}
       AI_ENDPOINT: ${AI_ENDPOINT:-http://host.docker.internal:1234/v1}
       AI_MODEL: ${AI_MODEL:-}
       AI_TEMPERATURE: ${AI_TEMPERATURE:-1}
