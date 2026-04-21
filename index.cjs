@@ -1,6 +1,5 @@
 const config = require('./config.cjs');
 const fs = require('node:fs');
-const crypto = require('node:crypto');
 const { Chess } = require('chess.js');
 
 const GAME_RUNTIME_CONFIG_FILE = '.game-runtime-config.json';
@@ -312,26 +311,14 @@ class LichessBot {
 
   getOrCreateGameRuntimeConfig(gameId) {
     const storedConfigs = this.readStoredGameRuntimeConfigs();
-    let configChanged = false;
+    if (storedConfigs[gameId]) return storedConfigs[gameId];
 
-    if (storedConfigs[gameId]) {
-      if (!storedConfigs[gameId].sessionId) {
-        storedConfigs[gameId].sessionId = crypto.randomUUID();
-        configChanged = true;
-      }
-    } else {
-      const runtimeConfig = this.loadRuntimeConfig();
-      storedConfigs[gameId] = {
-        ...runtimeConfig,
-        sessionId: crypto.randomUUID(),
-        lockedAt: new Date().toISOString()
-      };
-      configChanged = true;
-    }
-
-    if (configChanged) {
-      this.writeStoredGameRuntimeConfigs(storedConfigs);
-    }
+    const runtimeConfig = this.loadRuntimeConfig();
+    storedConfigs[gameId] = {
+      ...runtimeConfig,
+      lockedAt: new Date().toISOString()
+    };
+    this.writeStoredGameRuntimeConfigs(storedConfigs);
     return storedConfigs[gameId];
   }
 
@@ -865,9 +852,7 @@ Return only the UCI string.`;
       if (isOpenRouter) {
         headers['HTTP-Referer'] = 'https://github.com/franclaw/lichess-bot';
         headers['X-Title'] = 'Lichess AI Bot';
-        if (runtimeConfig.sessionId) {
-          headers['X-Session-ID'] = runtimeConfig.sessionId;
-        }
+        headers['X-Session-ID'] = gameId;
       }
 
       const reasoning = { enabled: true };
@@ -893,11 +878,7 @@ Return only the UCI string.`;
               reasoning,
               stream: true,
               user: this.myBotUsername,
-              ...(isOpenRouter && runtimeConfig.sessionId && {
-                metadata: {
-                  session_id: runtimeConfig.sessionId
-                }
-              })
+              session_id: gameId
             })
           });
 
