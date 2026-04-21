@@ -792,16 +792,16 @@ class LichessBot {
     
     // 1. Big log file for input and output: [game][model][input/output]
     const inOutEntry = `${commonPrefix}[${type}]\n${content}\n${'-'.repeat(80)}\n`;
-    fs.appendFileSync('ai_in_out.log', inOutEntry);
+    fs.appendFileSync('stream_logs/ai_in_out.log', inOutEntry);
 
     if (type === 'output') {
       // 2. Big log file for output: [game][model][output]
       const outPrefixedEntry = `${commonPrefix}[output]\n${content}\n${'-'.repeat(80)}\n`;
-      fs.appendFileSync('ai_out_prefixed.log', outPrefixedEntry);
+      fs.appendFileSync('stream_logs/ai_out_prefixed.log', outPrefixedEntry);
 
       // 3. Big log file for output: [game][model]
       const outEntry = `${commonPrefix}\n${content}\n${'-'.repeat(80)}\n`;
-      fs.appendFileSync('ai_out.log', outEntry);
+      fs.appendFileSync('stream_logs/ai_out.log', outEntry);
     }
   }
 
