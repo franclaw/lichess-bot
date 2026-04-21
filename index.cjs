@@ -29,7 +29,7 @@ class LichessBot {
     const runtimeConfig = this.loadRuntimeConfig();
     console.log('Initializing bot...');
     console.log(`AI Endpoint: ${runtimeConfig.aiEndpoint}`);
-    console.log(`AI model for new games: ${runtimeConfig.randomModel}`);
+    console.log(`AI model for new games: ${runtimeConfig.model}`);
     console.log(`My username: ${this.myBotUsername}\n`);
 
     const gameIds = process.argv.slice(2).filter(Boolean);
@@ -199,7 +199,7 @@ class LichessBot {
 
     const runtimeConfig = this.getOrCreateGameRuntimeConfig(gameId);
     this.gameRuntimeConfig.set(gameId, runtimeConfig);
-    console.log(`[${gameId}] Runtime config locked: model=${runtimeConfig.randomModel}, endpoint=${runtimeConfig.aiEndpoint}, temperature=${runtimeConfig.temperature}, reasoning_effort=${runtimeConfig.reasoningEffort}, reasoning_tokens=${runtimeConfig.reasoningTokens}, max_tokens=${runtimeConfig.maxTokens}`);
+    console.log(`[${gameId}] Runtime config locked: model=${runtimeConfig.model}, endpoint=${runtimeConfig.aiEndpoint}, temperature=${runtimeConfig.temperature}, reasoning_effort=${runtimeConfig.reasoningEffort}, reasoning_tokens=${runtimeConfig.reasoningTokens}, max_tokens=${runtimeConfig.maxTokens}`);
 
     console.log(`=== Watching game: ${gameId} ===`);
     const promise = this.watchGame(gameInfo)
@@ -276,26 +276,24 @@ class LichessBot {
     const modelFromEnv = this.getRuntimeEnvValue(envFile, 'AI_MODEL', config.model);
     const key = this.getRuntimeEnvValue(envFile, 'AI_API_KEY', '');
 
-    let randomModel;
+    let model;
     if (modelExplicitlySet) {
-      randomModel = modelFromEnv;
+      model = modelFromEnv;
     } else if (this.freeModelList && this.freeModelList.length > 0) {
-      randomModel = this.freeModelList[Math.floor(Math.random() * this.freeModelList.length)];
+      model = this.freeModelList[Math.floor(Math.random() * this.freeModelList.length)];
     } else {
-	  throw new Error('modelExplicitlySet false and free model selection failed.');
+      throw new Error('AI_MODEL not set and free model selection failed.');
     }
 
     return {
       aiEndpoint: endpoint,
-      model: modelFromEnv,
+      model,
       temperature: this.parseRuntimeNumber(this.getRuntimeEnvValue(envFile, 'AI_TEMPERATURE', '1'), 1),
       reasoningEffort: this.getRuntimeEnvValue(envFile, 'REASONING_EFFORT', 'medium'),
       reasoningTokens: this.parseRuntimeNumber(this.getRuntimeEnvValue(envFile, 'REASONING_TOKENS', '408'), 408),
       maxTokens: this.parseRuntimeNumber(this.getRuntimeEnvValue(envFile, 'MAX_TOKENS', '512'), 512),
       feedbackRetries: this.parseRuntimeNumber(this.getRuntimeEnvValue(envFile, 'AI_FEEDBACK_RETRIES', '4'), 4),
-      apiKey: key,
-      // Randomly select a free model if no specific model is configured
-      randomModel
+      apiKey: key
     };
   }
 
@@ -369,7 +367,7 @@ class LichessBot {
     await this.sendChatLog(
       gameId,
       'model',
-      `${runtimeConfig.randomModel}; temp=${runtimeConfig.temperature}; effort=${runtimeConfig.reasoningEffort}; reasoning_tokens=${runtimeConfig.reasoningTokens}; max_tokens=${runtimeConfig.maxTokens}`
+      `${runtimeConfig.model}; temp=${runtimeConfig.temperature}; effort=${runtimeConfig.reasoningEffort}; reasoning_tokens=${runtimeConfig.reasoningTokens}; max_tokens=${runtimeConfig.maxTokens}`
     );
 
   }
@@ -860,13 +858,13 @@ Return only the UCI string.`;
       const MAX_DELAY = 15 * 60 * 1000; // 15 minutes
       let attempt = 0;
       while (true) {
-        this.logAI(gameId, runtimeConfig.randomModel, 'input', JSON.stringify(messages, null, 2));
+        this.logAI(gameId, runtimeConfig.model, 'input', JSON.stringify(messages, null, 2));
         try {
           const response = await fetch(`${runtimeConfig.aiEndpoint}/chat/completions`, {
             method: 'POST',
             headers,
             body: JSON.stringify({
-              model: runtimeConfig.randomModel,
+              model: runtimeConfig.model,
               messages,
               temperature: runtimeConfig.temperature,
               max_tokens: runtimeConfig.maxTokens,
@@ -952,7 +950,7 @@ Return only the UCI string.`;
           }
 
           // Log the output for this attempt
-          this.logAI(gameId, runtimeConfig.randomModel, 'output', content);
+          this.logAI(gameId, runtimeConfig.model, 'output', content);
 
           return {
             move: this.parseMove(content, legalMoves),
