@@ -788,6 +788,25 @@ class LichessBot {
       .join('\n');
   }
 
+  logAI(gameId, model, type, content) {
+    const timestamp = new Date().toISOString();
+    const commonPrefix = `[${timestamp}][${gameId}][${model}]`;
+    
+    // 1. Big log file for input and output: [game][model][input/output]
+    const inOutEntry = `${commonPrefix}[${type}]\n${content}\n${'-'.repeat(80)}\n`;
+    fs.appendFileSync('ai_in_out.log', inOutEntry);
+
+    if (type === 'output') {
+      // 2. Big log file for output: [game][model][output]
+      const outPrefixedEntry = `${commonPrefix}[output]\n${content}\n${'-'.repeat(80)}\n`;
+      fs.appendFileSync('ai_out_prefixed.log', outPrefixedEntry);
+
+      // 3. Big log file for output: [game][model]
+      const outEntry = `${commonPrefix}\n${content}\n${'-'.repeat(80)}\n`;
+      fs.appendFileSync('ai_out.log', outEntry);
+    }
+  }
+
   async getAIMove(gameId, position, fen, lastOpponentMove, myColor, invalidMoves = [], legalMoves = [], runtimeConfig = this.loadRuntimeConfig(), correctionFeedback = '', lastRejectedMove = '') {
     const side = myColor || 'the side to move';
     const sideName = side.charAt(0).toUpperCase() + side.slice(1);
@@ -841,6 +860,7 @@ Return only the UCI string.`;
       const MAX_DELAY = 15 * 60 * 1000; // 15 minutes
       let attempt = 0;
       while (true) {
+        this.logAI(gameId, runtimeConfig.randomModel, 'input', JSON.stringify(messages, null, 2));
         try {
           const response = await fetch(`${runtimeConfig.aiEndpoint}/chat/completions`, {
             method: 'POST',
@@ -930,6 +950,9 @@ Return only the UCI string.`;
             console.error(`[${gameId}] AI response empty choice content`);
             throw new Error('AI response empty');
           }
+
+          // Log the output for this attempt
+          this.logAI(gameId, runtimeConfig.randomModel, 'output', content);
 
           return {
             move: this.parseMove(content, legalMoves),
