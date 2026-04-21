@@ -1,5 +1,6 @@
 const config = require('./config.cjs');
 const fs = require('node:fs');
+const crypto = require('node:crypto');
 const { Chess } = require('chess.js');
 
 const GAME_RUNTIME_CONFIG_FILE = '.game-runtime-config.json';
@@ -311,14 +312,26 @@ class LichessBot {
 
   getOrCreateGameRuntimeConfig(gameId) {
     const storedConfigs = this.readStoredGameRuntimeConfigs();
-    if (storedConfigs[gameId]) return storedConfigs[gameId];
+    let configChanged = false;
 
-    const runtimeConfig = this.loadRuntimeConfig();
-    storedConfigs[gameId] = {
-      ...runtimeConfig,
-      lockedAt: new Date().toISOString()
-    };
-    this.writeStoredGameRuntimeConfigs(storedConfigs);
+    if (storedConfigs[gameId]) {
+      if (!storedConfigs[gameId].sessionId) {
+        storedConfigs[gameId].sessionId = crypto.randomUUID();
+        configChanged = true;
+      }
+    } else {
+      const runtimeConfig = this.loadRuntimeConfig();
+      storedConfigs[gameId] = {
+        ...runtimeConfig,
+        sessionId: crypto.randomUUID(),
+        lockedAt: new Date().toISOString()
+      };
+      configChanged = true;
+    }
+
+    if (configChanged) {
+      this.writeStoredGameRuntimeConfigs(storedConfigs);
+    }
     return storedConfigs[gameId];
   }
 
@@ -843,9 +856,18 @@ Return only the UCI string.`;
     ];
     
     try {
+      const isOpenRouter = runtimeConfig.aiEndpoint.includes('openrouter.ai');
       const headers = { 'Content-Type': 'application/json' };
       if (runtimeConfig.apiKey) {
         headers['Authorization'] = `Bearer ${runtimeConfig.apiKey}`;
+      }
+
+      if (isOpenRouter) {
+        headers['HTTP-Referer'] = 'https://github.com/franclaw/lichess-bot';
+        headers['X-Title'] = 'Lichess AI Bot';
+        if (runtimeConfig.sessionId) {
+          headers['X-Session-ID'] = runtimeConfig.sessionId;
+        }
       }
 
       const reasoning = { enabled: true };
@@ -869,7 +891,13 @@ Return only the UCI string.`;
               temperature: runtimeConfig.temperature,
               max_tokens: runtimeConfig.maxTokens,
               reasoning,
-              stream: true
+              stream: true,
+              user: this.myBotUsername,
+              ...(isOpenRouter && runtimeConfig.sessionId && {
+                metadata: {
+                  session_id: runtimeConfig.sessionId
+                }
+              })
             })
           });
 
