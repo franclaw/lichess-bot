@@ -838,51 +838,119 @@ Return only the UCI string.`;
         reasoning.max_tokens = runtimeConfig.reasoningTokens;
       }
 
-      const response = await fetch(`${runtimeConfig.aiEndpoint}/chat/completions`, {
-        method: 'POST',
-        headers,
-        body: JSON.stringify({
-          model: runtimeConfig.randomModel,
-          messages,
-          temperature: runtimeConfig.temperature,
-          max_tokens: runtimeConfig.maxTokens,
-          reasoning
-        })
-      });
+      const MAX_DELAY = 15 * 60 * 1000; // 15 minutes
+      let attempt = 0;
+      while (true) {
+        try {
+          const response = await fetch(`${runtimeConfig.aiEndpoint}/chat/completions`, {
+            method: 'POST',
+            headers,
+            body: JSON.stringify({
+              model: runtimeConfig.randomModel,
+              messages,
+              temperature: runtimeConfig.temperature,
+              max_tokens: runtimeConfig.maxTokens,
+              reasoning,
+              stream: true
+            })
+          });
 
-      if (!response.ok) {
-        const errorText = await response.text().catch(() => 'no body');
-        console.error(`[${gameId}] AI request error status=${response.status} body=${errorText}`);
-        throw new Error(`AI API error: ${response.status}`);
-      }
+          if (response.status === 429) {
+            const retryAfter = response.headers.get('retry-after');
+            const delay = retryAfter ? Number(retryAfter) * 1000 : Math.min(Math.pow(2, attempt) * 2000, MAX_DELAY);
+            console.error(`[RATE LIMIT] AI request got HTTP 429; retrying in ${Math.round(delay/1000)}s...`);
+            await this.sleep(delay);
+            attempt++;
+            continue;
+          }
 
-      const text = await response.text();
-      let data;
-      try {
-        data = JSON.parse(text);
-      } catch (err) {
-        console.error(`[${gameId}] AI response not JSON. Raw: "${text}"`);
-        throw new Error('AI response not JSON');
-      }
+          if (response.status >= 500) {
+            const delay = Math.min(Math.pow(2, attempt) * 2000, MAX_DELAY);
+            console.error(`[${response.status}] AI service error, retrying in ${Math.round(delay/1000)}s (attempt ${attempt + 1})...`);
+            await this.sleep(delay);
+            attempt++;
+            continue;
+          }
 
-      if (data.error) {
-        console.error(`[${gameId}] AI provider returned error:`, JSON.stringify(data.error));
-        throw new Error(`AI provider error: ${data.error.message || data.error.code || 'unknown'}`);
-      }
+          if (!response.ok) {
+            const errorText = await response.text().catch(() => 'no body');
+            console.error(`[${gameId}] AI request error status=${response.status} body=${errorText}`);
+            throw new Error(`AI API error: ${response.status}`);
+          }
 
-      if (!data || !data.choices || data.choices.length === 0) {
-        console.error(`[${gameId}] AI response missing choices:`, JSON.stringify(data));
-        throw new Error('AI response missing choices');
+          // Process stream
+          const reader = response.body.getReader();
+          const decoder = new TextDecoder();
+          let content = '';
+          const logPath = `stream_logs/stream-${gameId}-attempt-${attempt + 1}.log`;
+          const logStream = fs.createWriteStream(logPath);
+          
+          try {
+            let buffer = '';
+            while (true) {
+              const { done, value } = await reader.read();
+              if (done) break;
+              
+              const chunk = decoder.decode(value, { stream: true });
+              logStream.write(chunk);
+              buffer += chunk;
+              
+              const lines = buffer.split('\n');
+              buffer = lines.pop() || '';
+              
+              for (const line of lines) {
+                const trimmed = line.trim();
+                if (!trimmed || trimmed === 'data: [DONE]') continue;
+                if (trimmed.startsWith('data: ')) {
+                  try {
+                    const data = JSON.parse(trimmed.slice(6));
+                    if (data.error) {
+                      console.error(`[${gameId}] AI provider returned error in stream:`, JSON.stringify(data.error));
+                      if (data.error.code === 524 || data.error.code === 502 || data.error.code === 429 || data.error.message?.includes('timeout')) {
+                        throw { isTransient: true, message: data.error.message || data.error.code };
+                      }
+                      throw new Error(`AI provider error: ${data.error.message || data.error.code}`);
+                    }
+                    const delta = data.choices?.[0]?.delta;
+                    if (delta) {
+                      content += delta.content || delta.reasoning_content || delta.reasoning || '';
+                    }
+                  } catch (e) {
+                    if (e.isTransient) throw e;
+                    // Ignore parse errors for partial/malformed JSON in stream unless it was our transient error
+                  }
+                }
+              }
+            }
+          } finally {
+            logStream.end();
+          }
+
+          if (!content) {
+            console.error(`[${gameId}] AI response empty choice content`);
+            throw new Error('AI response empty');
+          }
+
+          return {
+            move: this.parseMove(content, legalMoves),
+            content,
+            messages: [
+              ...messages,
+              { role: 'assistant', content }
+            ]
+          };
+        } catch (err) {
+          const delay = Math.min(Math.pow(2, attempt) * 2000, MAX_DELAY);
+          if (err.isTransient) {
+            console.log(`[${gameId}] Transient error during stream, retrying in ${Math.round(delay/1000)}s (attempt ${attempt + 1}): ${err.message}`);
+          } else {
+            console.error(`[${gameId}] AI attempt ${attempt + 1} failed: ${err.message}. Retrying in ${Math.round(delay/1000)}s...`);
+          }
+          await this.sleep(delay);
+          attempt++;
+        }
       }
-      const content = data.choices[0].message?.content || '';
-      return {
-        move: this.parseMove(content, legalMoves),
-        content,
-        messages: [
-          ...messages,
-          { role: 'assistant', content }
-        ]
-      };
+      throw new Error('AI API failed after 5 attempts');
     } catch (err) {
       console.error(`[${gameId}] AI request failed:`, err.message);
       throw err;
