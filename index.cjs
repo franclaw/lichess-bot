@@ -788,20 +788,14 @@ class LichessBot {
 
   logAI(gameId, model, type, content) {
     const timestamp = new Date().toISOString();
+    const inline = content.replace(/\n/g, '\\n');
     const commonPrefix = `[${timestamp}][${gameId}][${model}]`;
-    
-    // 1. Big log file for input and output: [game][model][input/output]
-    const inOutEntry = `${commonPrefix}[${type}]\n${content}\n${'-'.repeat(80)}\n`;
-    fs.appendFileSync('stream_logs/ai_in_out.log', inOutEntry);
 
-    if (type === 'output') {
-      // 2. Big log file for output: [game][model][output]
-      const outPrefixedEntry = `${commonPrefix}[output]\n${content}\n${'-'.repeat(80)}\n`;
-      fs.appendFileSync('stream_logs/ai_out_prefixed.log', outPrefixedEntry);
+    fs.appendFileSync('stream_logs/ai_in_out.log', `${commonPrefix}[${type}] ${inline}\n`);
 
-      // 3. Big log file for output: [game][model]
-      const outEntry = `${commonPrefix}\n${content}\n${'-'.repeat(80)}\n`;
-      fs.appendFileSync('stream_logs/ai_out.log', outEntry);
+    if (type === 'output' || type === 'output_partial') {
+      fs.appendFileSync('stream_logs/ai_out_prefixed.log', `${commonPrefix}[${type}] ${inline}\n`);
+      fs.appendFileSync('stream_logs/ai_out.log', `${commonPrefix} ${inline}\n`);
     }
   }
 
@@ -836,9 +830,9 @@ Last rejected move: ${lastRejectedMove || 'none'}.
 Failure feedback from previous attempt: ${correctionFeedback || 'none'}.
 
 Choose exactly one move copied from the Legal UCI moves line.
-Return only the UCI string.`;
+Your response must end with exactly: My answer is: [UCI move]`;
     const messages = [
-      { role: 'system', content: `You are a chess master that is playing chess on lichess as side ${side}. You will be presented with the state of the chess board and a list of legal moves. Choose need to choose 1 move from that explicit legal move list. You may reason privately, but your final visible answer must be one UCI move and nothing else. The answer must match this pattern: file-rank-file-rank, for example e2e4.` },
+      { role: 'system', content: `You are a chess master that is playing chess on lichess as side ${side}. You will be presented with the state of the chess board and a list of legal moves. Choose need to choose 1 move from that explicit legal move list. You may reason privately, but your response must end with exactly: My answer is: [UCI move] — for example: My answer is: e2e4.` },
       { role: 'user', content: prompt }
     ];
     
@@ -855,11 +849,20 @@ Return only the UCI string.`;
         headers['X-Session-ID'] = gameId;
       }
 
-      const reasoning = { enabled: true };
-      if (runtimeConfig.reasoningEffort) {
-        reasoning.effort = runtimeConfig.reasoningEffort;
-      } else if (runtimeConfig.reasoningTokens) {
-        reasoning.max_tokens = runtimeConfig.reasoningTokens;
+      let reasoning = null;
+      let thinking = null;
+      if (isOpenRouter) {
+        reasoning = {};
+        if (runtimeConfig.reasoningEffort) {
+          reasoning.effort = runtimeConfig.reasoningEffort;
+        } else if (runtimeConfig.reasoningTokens) {
+          reasoning.max_tokens = runtimeConfig.reasoningTokens;
+        }
+      } else {
+        thinking = { type: 'enabled' };
+        if (runtimeConfig.reasoningTokens) {
+          thinking.budget_tokens = runtimeConfig.reasoningTokens;
+        }
       }
 
       const MAX_DELAY = 15 * 60 * 1000; // 15 minutes
@@ -875,7 +878,9 @@ Return only the UCI string.`;
               messages,
               temperature: runtimeConfig.temperature,
               max_tokens: runtimeConfig.maxTokens,
-              reasoning,
+              ...(reasoning && { reasoning }),
+              ...(thinking && { thinking }),
+              ...(thinking && runtimeConfig.reasoningTokens && { thinking_budget_tokens: runtimeConfig.reasoningTokens }),
               stream: true,
               user: this.myBotUsername,
               session_id: gameId
@@ -914,17 +919,20 @@ Return only the UCI string.`;
           
           try {
             let buffer = '';
+            let lastLoggedLength = 0;
+            let lastLogTime = Date.now();
+            const PERIODIC_LOG_INTERVAL_MS = 1000;
             while (true) {
               const { done, value } = await reader.read();
               if (done) break;
-              
+
               const chunk = decoder.decode(value, { stream: true });
               logStream.write(chunk);
               buffer += chunk;
-              
+
               const lines = buffer.split('\n');
               buffer = lines.pop() || '';
-              
+
               for (const line of lines) {
                 const trimmed = line.trim();
                 if (!trimmed || trimmed === 'data: [DONE]') continue;
@@ -947,6 +955,13 @@ Return only the UCI string.`;
                     // Ignore parse errors for partial/malformed JSON in stream unless it was our transient error
                   }
                 }
+              }
+
+              const now = Date.now();
+              if (now - lastLogTime >= PERIODIC_LOG_INTERVAL_MS && content.length > lastLoggedLength) {
+                this.logAI(gameId, runtimeConfig.model, 'output_partial', content.slice(lastLoggedLength));
+                lastLoggedLength = content.length;
+                lastLogTime = now;
               }
             }
           } finally {
@@ -994,7 +1009,7 @@ Return only the UCI string.`;
 
     const extractUci = (text) => {
       const cleaned = text.replace(/```[a-z]*\n?/gi, ' ').replace(/```/g, ' ');
-      const tokens = [...cleaned.matchAll(/\b([a-h][1-8][a-h][1-8][qrbn]?)\b/g)].map((match) => match[1]);
+      const tokens = [...cleaned.matchAll(/(?=([a-h][1-8][a-h][1-8][qrbn]?))/g)].map((match) => match[1]);
       if (!tokens.length) return null;
 
       // Prefer legal tokens, and prefer the last one in case the model listed options first.
@@ -1005,6 +1020,13 @@ Return only the UCI string.`;
 
       return tokens[tokens.length - 1];
     };
+
+    // Preferred format: "My answer is: e2e4"
+    const myAnswerMatch = content.match(/my answer is:\s*([a-h][1-8][a-h][1-8][qrbn]?)/i);
+    if (myAnswerMatch) {
+      const move = myAnswerMatch[1];
+      if (!legalByUci.size || legalByUci.has(move)) return move;
+    }
 
     // Gemma-style channel output: prefer explicit final channel when present.
     const finalChannelMatch = content.match(/<\|channel\>\s*final\b([\s\S]*)/i);
