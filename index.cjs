@@ -690,7 +690,9 @@ class LichessBot {
         continue;
       }
 
-      const move = result.move;
+      const moveObj = result.move;
+      const move = moveObj.move;
+      const reasoning = moveObj.reasoning;
       const rawResponse = (result.content || "").trim() || "<empty>";
       
       if (!move || !/^[a-h][1-8][a-h][1-8][qrbn]?$/.test(move)) {
@@ -714,6 +716,9 @@ class LichessBot {
       }
       
       console.log(`[${gameId}] Attempting move: ${move}`);
+      if (reasoning) {
+        await this.sendChatLog(gameId, 'reason', reasoning, 'spectator');
+      }
       
       try {
         await this.fetch(`${this.apiBase}/bot/game/${gameId}/move/${move}`, { method: 'POST' });
@@ -830,9 +835,10 @@ Last rejected move: ${lastRejectedMove || 'none'}.
 Failure feedback from previous attempt: ${correctionFeedback || 'none'}.
 
 Choose exactly one move copied from the Legal UCI moves line.
-Your response must end with exactly: My answer is: [UCI move]`;
+Provide a one-line reasoning for your move, then your move.
+Your response must end with exactly: Reasoning: [one line reasoning] My answer is: [UCI move]`;
     const messages = [
-      { role: 'system', content: `You are a chess master that is playing chess on lichess as side ${side}. You will be presented with the state of the chess board and a list of legal moves. Choose need to choose 1 move from that explicit legal move list. You may reason privately, but your response must end with exactly: My answer is: [UCI move] — for example: My answer is: e2e4.` },
+      { role: 'system', content: `You are a chess master that is playing chess on lichess as side ${side}. You will be presented with the state of the chess board and a list of legal moves. Choose need to choose 1 move from that explicit legal move list. You may reason privately, but your response must end with exactly: Reasoning: [one line reasoning] My answer is: [UCI move] — for example: Reasoning: Controlling the center with a pawn. My answer is: e2e4.` },
       { role: 'user', content: prompt }
     ];
     
@@ -1003,7 +1009,7 @@ Your response must end with exactly: My answer is: [UCI move]`;
   }
 
   parseMove(content, legalMoves = []) {
-    if (!content) return null;
+    if (!content) return { move: null, reasoning: null };
     
     const legalByUci = new Map(legalMoves.map((move) => [move.uci, move]));
 
@@ -1021,39 +1027,55 @@ Your response must end with exactly: My answer is: [UCI move]`;
       return tokens[tokens.length - 1];
     };
 
-    // Preferred format: "My answer is: e2e4"
+    let move = null;
+    let reasoning = null;
+
+    // Preferred format: "Reasoning: [one line] My answer is: [UCI move]"
+    const reasonAndMoveMatch = content.match(/reasoning:\s*(.*?)\s*my answer is:\s*([a-h][1-8][a-h][1-8][qrbn]?)/i);
+    if (reasonAndMoveMatch) {
+      reasoning = reasonAndMoveMatch[1].trim();
+      move = reasonAndMoveMatch[2];
+      if (!legalByUci.size || legalByUci.has(move)) return { move, reasoning };
+    }
+
+    // Fallback to just "My answer is: e2e4"
     const myAnswerMatch = content.match(/my answer is:\s*([a-h][1-8][a-h][1-8][qrbn]?)/i);
     if (myAnswerMatch) {
-      const move = myAnswerMatch[1];
-      if (!legalByUci.size || legalByUci.has(move)) return move;
+      move = myAnswerMatch[1];
+      if (!legalByUci.size || legalByUci.has(move)) {
+        // Try to find reasoning line before this match
+        const reasoningBefore = content.slice(0, myAnswerMatch.index).split('\n').filter(l => l.toLowerCase().includes('reasoning:')).pop();
+        if (reasoningBefore) reasoning = reasoningBefore.replace(/reasoning:\s*/i, '').trim();
+        return { move, reasoning };
+      }
     }
 
     // Gemma-style channel output: prefer explicit final channel when present.
     const finalChannelMatch = content.match(/<\|channel\>\s*final\b([\s\S]*)/i);
     if (finalChannelMatch) {
-      const move = extractUci(finalChannelMatch[1]);
-      if (move) return move;
+      move = extractUci(finalChannelMatch[1]);
+      if (move) return { move, reasoning };
     }
 
     // Generic final-answer markers.
     const finalLineMatch = content.match(/(?:final answer|answer)\s*[:\-]\s*([^\n]+)/i);
     if (finalLineMatch) {
-      const move = extractUci(finalLineMatch[1]);
-      if (move) return move;
+      move = extractUci(finalLineMatch[1]);
+      if (move) return { move, reasoning };
     }
 
     const fallbackMove = extractUci(content);
-    if (fallbackMove) return fallbackMove;
+    if (fallbackMove) return { move: fallbackMove, reasoning };
 
     const normalized = content.trim().replace(/[`"'.]/g, '');
-    for (const move of legalByUci.values()) {
-      const san = move.san.replace(/[+#]$/, '');
-      if (normalized === move.san || normalized === san || normalized.includes(move.san) || normalized.includes(san)) {
-        return move.uci;
+    for (const legal of legalByUci.values()) {
+      const san = legal.san.replace(/[+#]$/, '');
+      if (normalized === legal.san || normalized === san || normalized.includes(legal.san) || normalized.includes(san)) {
+        return { move: legal.uci, reasoning };
       }
     }
     
-    return null;
+    return { move: null, reasoning: null };
   }
 
   async fetch(url, options = {}) {
