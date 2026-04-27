@@ -341,7 +341,7 @@ class LichessBot {
     }
   }
 
-  async sendChatLog(gameId, label, text, room = 'player') {
+  async sendChatLog(gameId, label, text, room = 'spectator') {
     const maxMessageLength = 140;
     const normalized = String(text || '').trim() || '<empty>';
     const prefix = `[${label}] `;
@@ -685,7 +685,7 @@ class LichessBot {
         );
       } catch (err) {
         console.error(`[${gameId}] AI API failure: ${err.message}. Retrying in 5m...`);
-        await this.sendChatMessage(gameId, 'player', `AI API error: ${err.message}. Retrying in 5m...`);
+        await this.sendChatMessage(gameId, 'spectator', `AI API error: ${err.message}. Retrying in 5m...`);
         await this.sleep(retryDelayMs);
         continue;
       }
@@ -698,7 +698,7 @@ class LichessBot {
         correctionFeedback = `Your previous answer "${rawResponse}" did not provide exactly one legal UCI move. Reply with only one UCI move from the legal move list. Legal UCI moves again: ${legalMoveMenu}`;
         lastRejectedMove = move || "";
         if (move) invalidMoves.push(move);
-        await this.sendChatMessage(gameId, 'player', `AI format error. Retrying in 5m...`);
+        await this.sendChatMessage(gameId, 'spectator', `AI format error. Retrying in 5m...`);
         await this.sleep(retryDelayMs);
         continue;
       }
@@ -708,7 +708,7 @@ class LichessBot {
         correctionFeedback = `Your previous move "${move}" is illegal in this position. Choose a different move from the legal move list. Legal UCI moves again: ${legalMoveMenu}`;
         lastRejectedMove = move;
         invalidMoves.push(move);
-        await this.sendChatMessage(gameId, 'player', `AI illegal move: ${move}. Retrying in 5m...`);
+        await this.sendChatMessage(gameId, 'spectator', `AI illegal move: ${move}. Retrying in 5m...`);
         await this.sleep(retryDelayMs);
         continue;
       }
@@ -725,7 +725,7 @@ class LichessBot {
           return { resync: true };
         }
         console.error(`[${gameId}] Lichess move submission failed: ${err.message}. Retrying in 5m...`);
-        await this.sendChatMessage(gameId, 'player', `Lichess error: ${err.message}. Retrying in 5m...`);
+        await this.sendChatMessage(gameId, 'spectator', `Lichess error: ${err.message}. Retrying in 5m...`);
         await this.sleep(retryDelayMs);
       }
     }
