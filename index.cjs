@@ -172,9 +172,25 @@ class LichessBot {
     const variant = challenge.variant?.key || challenge.variant?.name || 'unknown';
     const speed = challenge.speed || 'unknown';
     const color = challenge.color || 'random';
+    const rated = !!challenge.rated;
+
+    if (speed !== 'correspondence' || rated !== false) {
+      const reason = rated !== false ? 'rated' : 'tooFast';
+      console.log(`Declining challenge ${challengeId} from ${challenger}: only casual correspondence games are accepted (speed: ${speed}, rated: ${rated}, reason: ${reason})`);
+      try {
+        await this.fetch(`${this.apiBase}/challenge/${challengeId}/decline`, { 
+          method: 'POST',
+          body: JSON.stringify({ reason })
+        });
+      } catch (err) {
+        console.error(`Challenge decline failed (${challengeId}):`, err.message);
+      }
+      this.pendingChallenges.delete(challengeId);
+      return;
+    }
 
     try {
-      console.log(`Accepting challenge ${challengeId} from ${challenger} (${variant}, ${speed}, ${color})`);
+      console.log(`Accepting challenge ${challengeId} from ${challenger} (${variant}, ${speed}, ${color}, rated: ${rated})`);
       await this.fetch(`${this.apiBase}/challenge/${challengeId}/accept`, { method: 'POST' });
       console.log(`Challenge accepted: ${challengeId}`);
     } catch (err) {
