@@ -716,7 +716,7 @@ class LichessBot {
       
       if (!move || !/^[a-h][1-8][a-h][1-8][qrbn]?$/.test(move)) {
         console.log(`[${gameId}] Invalid move format: ${move || "<none>"} (Raw response: "${rawResponse}"). Retrying in 5m...`);
-        correctionFeedback = `Your previous answer "${rawResponse}" did not provide exactly one legal UCI move. Reply with only one UCI move from the legal move list. Legal UCI moves again: ${legalMoveMenu}`;
+        correctionFeedback = `Your previous answer "${rawResponse}" did not provide exactly one legal UCI move. Reply with one UCI move copied from the legal move list. Legal UCI moves again: ${legalMoveMenu}`;
         lastRejectedMove = move || "";
         if (move) invalidMoves.push(move);
         await this.sendChatMessage(gameId, 'both', `AI format error. Retrying in 5m...`);
@@ -726,7 +726,7 @@ class LichessBot {
 
       if (!this.isLegalMove(position, fen, myColor, move)) {
         console.log(`[${gameId}] AI chose illegal move: ${move}. Retrying in 5m...`);
-        correctionFeedback = `Your previous move "${move}" is illegal in this position. Choose a different move from the legal move list. Legal UCI moves again: ${legalMoveMenu}`;
+        correctionFeedback = `Your previous move "${move}" is illegal in this position. Choose a different UCI move from the legal move list. Legal UCI moves again: ${legalMoveMenu}`;
         lastRejectedMove = move;
         invalidMoves.push(move);
         await this.sendChatMessage(gameId, 'both', `AI illegal move: ${move}. Retrying in 5m...`);
@@ -736,7 +736,7 @@ class LichessBot {
       
       console.log(`[${gameId}] Attempting move: ${move}`);
       if (reasoning) {
-        await this.sendChatLog(gameId, 'reason', reasoning, 'both');
+        await this.sendChatLog(gameId, 'justification', reasoning, 'both');
       }
       
       try {
@@ -848,16 +848,13 @@ Last opponent move (UCI): ${lastOpponentMove}.
 
 Legal UCI moves:
 ${legalMoveMenu}
+${invalidMoves.length ? `\nRejected moves (must not be played): ${invalidMoves.join(', ')}.` : ''}${lastRejectedMove ? `\nLast rejected move: ${lastRejectedMove}.` : ''}${correctionFeedback ? `\nFailure feedback from previous attempt: ${correctionFeedback}.` : ''}
 
-Rejected moves (must not be played): ${invalidMoves.length ? invalidMoves.join(', ') : 'none'}.
-Last rejected move: ${lastRejectedMove || 'none'}.
-Failure feedback from previous attempt: ${correctionFeedback || 'none'}.
-
-Choose exactly one move copied from the Legal UCI moves line.
-Provide a one-line reasoning for your move, then your move.
-Your response must end with exactly: Reasoning: [one line reasoning] My answer is: [UCI move]`;
+Choose exactly one UCI move copied from the Legal UCI moves line.
+Provide one short sentence of justification for your move, then your move.
+Your response must end with exactly: Justification: [one short sentence] My answer is: [UCI move]`;
     const messages = [
-      { role: 'system', content: `You are a chess master that is playing chess on lichess as side ${side}. You will be presented with the state of the chess board and a list of legal moves. Choose need to choose 1 move from that explicit legal move list. You may reason privately, but your response must end with exactly: Reasoning: [one line reasoning] My answer is: [UCI move] — for example: Reasoning: Controlling the center with a pawn. My answer is: e2e4.` },
+      { role: 'system', content: `You are a chess master that is playing chess on lichess as side ${side}. You will be presented with the state of the chess board and a list of legal UCI moves. Choose exactly 1 UCI move from that explicit legal move list. Do not answer in SAN. You may reason privately, but your response must end with exactly: Justification: [one short sentence] My answer is: [UCI move] — for example: Justification: This controls the center. My answer is: e2e4.` },
       { role: 'user', content: prompt }
     ];
     
@@ -876,14 +873,17 @@ Your response must end with exactly: Reasoning: [one line reasoning] My answer i
 
       let reasoning = null;
       let thinking = null;
-      if (isOpenRouter) {
+      if (runtimeConfig.reasoningEffort || runtimeConfig.reasoningTokens) {
         reasoning = {};
         if (runtimeConfig.reasoningEffort) {
           reasoning.effort = runtimeConfig.reasoningEffort;
-        } else if (runtimeConfig.reasoningTokens) {
+        }
+        if (runtimeConfig.reasoningTokens) {
           reasoning.max_tokens = runtimeConfig.reasoningTokens;
         }
-      } else {
+      }
+
+      if (!isOpenRouter) {
         thinking = { type: 'enabled' };
         if (runtimeConfig.reasoningTokens) {
           thinking.budget_tokens = runtimeConfig.reasoningTokens;
@@ -906,7 +906,7 @@ Your response must end with exactly: Reasoning: [one line reasoning] My answer i
               ...(reasoning && { reasoning }),
               ...(thinking && { thinking }),
               ...(thinking && runtimeConfig.reasoningTokens && { thinking_budget_tokens: runtimeConfig.reasoningTokens }),
-              stream: true,
+              stream: false,
               user: this.myBotUsername,
               session_id: gameId
             })
@@ -935,63 +935,28 @@ Your response must end with exactly: Reasoning: [one line reasoning] My answer i
             throw new Error(`AI API error: ${response.status}`);
           }
 
-          // Process stream
-          const reader = response.body.getReader();
-          const decoder = new TextDecoder();
-          let content = '';
-          const logPath = `stream_logs/stream-${gameId}-attempt-${attempt + 1}.log`;
-          const logStream = fs.createWriteStream(logPath);
-          
+          const responseText = await response.text();
+          let data;
           try {
-            let buffer = '';
-            let lastLoggedLength = 0;
-            let lastLogTime = Date.now();
-            const PERIODIC_LOG_INTERVAL_MS = 1000;
-            while (true) {
-              const { done, value } = await reader.read();
-              if (done) break;
-
-              const chunk = decoder.decode(value, { stream: true });
-              logStream.write(chunk);
-              buffer += chunk;
-
-              const lines = buffer.split('\n');
-              buffer = lines.pop() || '';
-
-              for (const line of lines) {
-                const trimmed = line.trim();
-                if (!trimmed || trimmed === 'data: [DONE]') continue;
-                if (trimmed.startsWith('data: ')) {
-                  try {
-                    const data = JSON.parse(trimmed.slice(6));
-                    if (data.error) {
-                      console.error(`[${gameId}] AI provider returned error in stream:`, JSON.stringify(data.error));
-                      if (data.error.code === 524 || data.error.code === 502 || data.error.code === 429 || data.error.message?.includes('timeout')) {
-                        throw { isTransient: true, message: data.error.message || data.error.code };
-                      }
-                      throw new Error(`AI provider error: ${data.error.message || data.error.code}`);
-                    }
-                    const delta = data.choices?.[0]?.delta;
-                    if (delta) {
-                      content += delta.content || delta.reasoning_content || delta.reasoning || '';
-                    }
-                  } catch (e) {
-                    if (e.isTransient) throw e;
-                    // Ignore parse errors for partial/malformed JSON in stream unless it was our transient error
-                  }
-                }
-              }
-
-              const now = Date.now();
-              if (now - lastLogTime >= PERIODIC_LOG_INTERVAL_MS && content.length > lastLoggedLength) {
-                this.logAI(gameId, runtimeConfig.model, 'output_partial', content.slice(lastLoggedLength));
-                lastLoggedLength = content.length;
-                lastLogTime = now;
-              }
-            }
-          } finally {
-            logStream.end();
+            data = JSON.parse(responseText);
+          } catch {
+            throw new Error(responseText ? `AI API returned invalid JSON: ${responseText}` : 'AI API returned invalid JSON');
           }
+
+          if (data.error) {
+            console.error(`[${gameId}] AI provider returned error:`, JSON.stringify(data.error));
+            if (data.error.code === 524 || data.error.code === 502 || data.error.code === 429 || data.error.message?.includes('timeout')) {
+              throw { isTransient: true, message: data.error.message || data.error.code };
+            }
+            throw new Error(`AI provider error: ${data.error.message || data.error.code}`);
+          }
+
+          const content =
+            data.choices?.[0]?.message?.content ||
+            data.choices?.[0]?.message?.reasoning_content ||
+            data.choices?.[0]?.message?.reasoning ||
+            data.choices?.[0]?.text ||
+            '';
 
           if (!content) {
             console.error(`[${gameId}] AI response empty choice content`);
@@ -1012,7 +977,7 @@ Your response must end with exactly: Reasoning: [one line reasoning] My answer i
         } catch (err) {
           const delay = Math.min(Math.pow(2, attempt) * 2000, MAX_DELAY);
           if (err.isTransient) {
-            console.log(`[${gameId}] Transient error during stream, retrying in ${Math.round(delay/1000)}s (attempt ${attempt + 1}): ${err.message}`);
+            console.log(`[${gameId}] Transient AI error, retrying in ${Math.round(delay/1000)}s (attempt ${attempt + 1}): ${err.message}`);
           } else {
             console.error(`[${gameId}] AI attempt ${attempt + 1} failed: ${err.message}. Retrying in ${Math.round(delay/1000)}s...`);
           }
@@ -1029,71 +994,64 @@ Your response must end with exactly: Reasoning: [one line reasoning] My answer i
 
   parseMove(content, legalMoves = []) {
     if (!content) return { move: null, reasoning: null };
-    
+
     const legalByUci = new Map(legalMoves.map((move) => [move.uci, move]));
-
-    const extractUci = (text) => {
-      const cleaned = text.replace(/```[a-z]*\n?/gi, ' ').replace(/```/g, ' ');
-      const tokens = [...cleaned.matchAll(/(?=([a-h][1-8][a-h][1-8][qrbn]?))/g)].map((match) => match[1]);
-      if (!tokens.length) return null;
-
-      // Prefer legal tokens, and prefer the last one in case the model listed options first.
-      if (legalByUci.size > 0) {
-        const legalTokens = tokens.filter((token) => legalByUci.has(token));
-        if (legalTokens.length) return legalTokens[legalTokens.length - 1];
-      }
-
-      return tokens[tokens.length - 1];
+    const normalizeMove = (move) => {
+      const trimmed = String(move || '').trim();
+      if (!/^[a-h][1-8][a-h][1-8][qrbn]?$/.test(trimmed)) return null;
+      if (legalByUci.size && !legalByUci.has(trimmed)) return null;
+      return trimmed;
     };
+    const stripWrapping = (text) => String(text)
+      .trim()
+      .replace(/^```(?:text|uci)?\s*/i, '')
+      .replace(/\s*```$/i, '')
+      .trim();
+    const uciPattern = /[a-h][1-8][a-h][1-8][qrbn]?/;
 
-    let move = null;
-    let reasoning = null;
-
-    // Preferred format: "Reasoning: [one line] My answer is: [UCI move]"
-    const reasonAndMoveMatch = content.match(/reasoning:\s*(.*?)\s*my answer is:\s*([a-h][1-8][a-h][1-8][qrbn]?)/i);
-    if (reasonAndMoveMatch) {
-      reasoning = reasonAndMoveMatch[1].trim();
-      move = reasonAndMoveMatch[2];
-      if (!legalByUci.size || legalByUci.has(move)) return { move, reasoning };
-    }
-
-    // Fallback to just "My answer is: e2e4"
-    const myAnswerMatch = content.match(/my answer is:\s*([a-h][1-8][a-h][1-8][qrbn]?)/i);
-    if (myAnswerMatch) {
-      move = myAnswerMatch[1];
-      if (!legalByUci.size || legalByUci.has(move)) {
-        // Try to find reasoning line before this match
-        const reasoningBefore = content.slice(0, myAnswerMatch.index).split('\n').filter(l => l.toLowerCase().includes('reasoning:')).pop();
-        if (reasoningBefore) reasoning = reasoningBefore.replace(/reasoning:\s*/i, '').trim();
-        return { move, reasoning };
+    const parseStrictFinalAnswer = (text) => {
+      const cleaned = stripWrapping(text);
+      const exactMoveMatch = cleaned.match(new RegExp(`^(${uciPattern.source})$`));
+      if (exactMoveMatch) {
+        const move = normalizeMove(exactMoveMatch[1]);
+        if (move) return { move, reasoning: null };
       }
-    }
+
+      const reasonAndMoveMatch = cleaned.match(new RegExp(`(?:^|\\n)\\s*Justification:\\s*([^\\n]*?)\\s+My answer is:?\\s*\`?(${uciPattern.source})\`?\\s*\\.?\\s*$`, 'i'));
+      if (reasonAndMoveMatch) {
+        const move = normalizeMove(reasonAndMoveMatch[2]);
+        if (!move) return null;
+        return {
+          move,
+          reasoning: reasonAndMoveMatch[1].trim() || null
+        };
+      }
+
+      const myAnswerOnlyMatch = cleaned.match(new RegExp(`(?:^|\\n)\\s*My answer is:?\\s*\`?(${uciPattern.source})\`?\\s*\\.?\\s*$`, 'i'));
+      if (myAnswerOnlyMatch) {
+        const move = normalizeMove(myAnswerOnlyMatch[1]);
+        if (move) return { move, reasoning: null };
+      }
+
+      const finalAnswerMatch = cleaned.match(new RegExp(`(?:^|\\n)\\s*(?:Final answer|Answer)\\s*[:\\-]\\s*\`?(${uciPattern.source})\`?\\s*\\.?\\s*$`, 'i'));
+      if (finalAnswerMatch) {
+        const move = normalizeMove(finalAnswerMatch[1]);
+        if (move) return { move, reasoning: null };
+      }
+
+      return null;
+    };
 
     // Gemma-style channel output: prefer explicit final channel when present.
     const finalChannelMatch = content.match(/<\|channel\>\s*final\b([\s\S]*)/i);
     if (finalChannelMatch) {
-      move = extractUci(finalChannelMatch[1]);
-      if (move) return { move, reasoning };
+      const parsedFinalChannel = parseStrictFinalAnswer(finalChannelMatch[1]);
+      if (parsedFinalChannel) return parsedFinalChannel;
     }
 
-    // Generic final-answer markers.
-    const finalLineMatch = content.match(/(?:final answer|answer)\s*[:\-]\s*([^\n]+)/i);
-    if (finalLineMatch) {
-      move = extractUci(finalLineMatch[1]);
-      if (move) return { move, reasoning };
-    }
+    const parsed = parseStrictFinalAnswer(content);
+    if (parsed) return parsed;
 
-    const fallbackMove = extractUci(content);
-    if (fallbackMove) return { move: fallbackMove, reasoning };
-
-    const normalized = content.trim().replace(/[`"'.]/g, '');
-    for (const legal of legalByUci.values()) {
-      const san = legal.san.replace(/[+#]$/, '');
-      if (normalized === legal.san || normalized === san || normalized.includes(legal.san) || normalized.includes(san)) {
-        return { move: legal.uci, reasoning };
-      }
-    }
-    
     return { move: null, reasoning: null };
   }
 
@@ -1122,6 +1080,10 @@ Your response must end with exactly: Reasoning: [one line reasoning] My answer i
   }
 }
 
-console.log('Starting Lichess AI Bot...\n');
-const bot = new LichessBot();
-bot.init().catch(console.error);
+module.exports = { LichessBot };
+
+if (require.main === module) {
+  console.log('Starting Lichess AI Bot...\n');
+  const bot = new LichessBot();
+  bot.init().catch(console.error);
+}
