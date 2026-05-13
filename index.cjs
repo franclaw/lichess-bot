@@ -713,9 +713,12 @@ class LichessBot {
       const move = moveObj.move;
       const reasoning = moveObj.reasoning;
       const rawResponse = (result.content || "").trim() || "<empty>";
+      const turnNumber = this.getTurnNumber(position);
+      const attemptNumber = result.attempt || 1;
       
       if (!move || !/^[a-h][1-8][a-h][1-8][qrbn]?$/.test(move)) {
         console.log(`[${gameId}] Invalid move format: ${move || "<none>"} (Raw response: "${rawResponse}"). Retrying in 5m...`);
+        this.saveAIFormatError(gameId, turnNumber, attemptNumber, result.requestBody, result.responseBody);
         correctionFeedback = `Your previous answer "${rawResponse}" did not provide exactly one legal UCI move. Reply with one UCI move copied from the legal move list. Legal UCI moves again: ${legalMoveMenu}`;
         lastRejectedMove = move || "";
         if (move) invalidMoves.push(move);
@@ -823,6 +826,26 @@ class LichessBot {
     }
   }
 
+  getTurnNumber(position) {
+    const moves = String(position || '').trim().split(/\s+/).filter(Boolean);
+    return Math.floor(moves.length / 2) + 1;
+  }
+
+  saveAIFormatError(gameId, turnNumber, attemptNumber, requestBody, responseBody) {
+    const errorsDir = 'errors';
+    fs.mkdirSync(errorsDir, { recursive: true });
+
+    const baseName = `${gameId}_${turnNumber}_attempt${attemptNumber}`;
+    fs.writeFileSync(
+      `${errorsDir}/${baseName}.requestbody.json`,
+      `${JSON.stringify(requestBody, null, 2)}\n`
+    );
+    fs.writeFileSync(
+      `${errorsDir}/${baseName}.responsebody.json`,
+      `${JSON.stringify(responseBody, null, 2)}\n`
+    );
+  }
+
   async getAIMove(gameId, position, fen, lastOpponentMove, myColor, invalidMoves = [], legalMoves = [], runtimeConfig = this.loadRuntimeConfig(), correctionFeedback = '', lastRejectedMove = '') {
     const side = myColor || 'the side to move';
     const sideName = side.charAt(0).toUpperCase() + side.slice(1);
@@ -890,6 +913,19 @@ Your response must end with exactly: Justification: [one short sentence] My answ
         }
       }
 
+      const requestBody = {
+        model: runtimeConfig.model,
+        messages,
+        temperature: runtimeConfig.temperature,
+        max_tokens: runtimeConfig.maxTokens,
+        ...(reasoning && { reasoning }),
+        ...(thinking && { thinking }),
+        ...(thinking && runtimeConfig.reasoningTokens && { thinking_budget_tokens: runtimeConfig.reasoningTokens }),
+        stream: false,
+        user: this.myBotUsername,
+        session_id: gameId
+      };
+
       const MAX_DELAY = 15 * 60 * 1000; // 15 minutes
       let attempt = 0;
       while (true) {
@@ -898,18 +934,7 @@ Your response must end with exactly: Justification: [one short sentence] My answ
           const response = await fetch(`${runtimeConfig.aiEndpoint}/chat/completions`, {
             method: 'POST',
             headers,
-            body: JSON.stringify({
-              model: runtimeConfig.model,
-              messages,
-              temperature: runtimeConfig.temperature,
-              max_tokens: runtimeConfig.maxTokens,
-              ...(reasoning && { reasoning }),
-              ...(thinking && { thinking }),
-              ...(thinking && runtimeConfig.reasoningTokens && { thinking_budget_tokens: runtimeConfig.reasoningTokens }),
-              stream: false,
-              user: this.myBotUsername,
-              session_id: gameId
-            })
+            body: JSON.stringify(requestBody)
           });
 
           if (response.status === 429) {
@@ -960,6 +985,7 @@ Your response must end with exactly: Justification: [one short sentence] My answ
 
           if (!content) {
             console.error(`[${gameId}] AI response empty choice content`);
+            this.saveAIFormatError(gameId, this.getTurnNumber(position), attempt + 1, requestBody, data);
             throw new Error('AI response empty');
           }
 
@@ -969,6 +995,9 @@ Your response must end with exactly: Justification: [one short sentence] My answ
           return {
             move: this.parseMove(content, legalMoves),
             content,
+            attempt: attempt + 1,
+            requestBody,
+            responseBody: data,
             messages: [
               ...messages,
               { role: 'assistant', content }

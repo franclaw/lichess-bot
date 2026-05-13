@@ -3,3 +3,4 @@ node_modules
 .game-*
 stream_logs
 ai_*.log
+errors/
