@@ -38,7 +38,7 @@ Use `GAME_BLOCKLIST` and `GAME_ALLOWLIST` to split games across bot instances. B
 
 AI runtime settings are locked per game in `.game-runtime-config.json` when a watcher starts. Active and resumed games keep their original model/settings; newly started games re-read `.env` and lock the current values.
 
-At game start, the bot posts its locked model/settings and input format to player chat. After each model call, it posts the raw visible model output to chat before parsing the move, so any reasoning text emitted by the local model is visible.
+At game start, the bot posts its locked model/settings and input format to player chat. After each model call, it posts the raw visible model output to chat before parsing the move, so any justification text emitted by the local model is visible.
 
 ## How it works
 

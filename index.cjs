@@ -21,13 +21,15 @@ class LichessBot {
     this.gameRuntimeConfig = new Map();
     this.gameChatIntroSent = new Set();
     this.pendingChallenges = new Set();
+    this.availableModelIds = [];
+    this.selectedModel = null;
   }
 
   async init() {
-    // Fetch free models from OpenRouter at startup
-    this.freeModelList = await this.fetchFreeModelsList();
-    const runtimeConfig = this.loadRuntimeConfig();
     console.log('Initializing bot...');
+    await this.ensureModelSelected();
+
+    const runtimeConfig = this.loadRuntimeConfig();
     console.log(`AI Endpoint: ${runtimeConfig.aiEndpoint}`);
     console.log(`AI model for new games: ${runtimeConfig.model}`);
     console.log(`My username: ${this.myBotUsername}\n`);
@@ -95,8 +97,8 @@ class LichessBot {
         console.error('Event stream error:', err.message);
       }
 
-      console.log('Event stream closed; reconnecting in 5s');
-      await this.sleep(5000);
+      console.log('Event stream closed; reconnecting in 60s');
+      await this.sleep(60000);
     }
   }
 
@@ -262,48 +264,71 @@ class LichessBot {
 
   getRuntimeEnvValue(envFile, key, fallback) {
     if (Object.prototype.hasOwnProperty.call(envFile, key) && envFile[key] !== '') return envFile[key];
-    if (process.env[key]) return process.env[key];
     return fallback;
   }
 
-  async fetchFreeModelsList() {
-    const key = this.getRuntimeEnvValue(this.parseEnvFile(), 'AI_API_KEY', '');
+  async fetchAvailableModels() {
+    const envFile = this.parseEnvFile();
+    const endpoint = this.getRuntimeEnvValue(envFile, 'AI_ENDPOINT', config.aiEndpoint);
+    const key = this.getRuntimeEnvValue(envFile, 'AI_API_KEY', '');
+    
     try {
-      const response = await fetch('https://openrouter.ai/api/v1/models', {
+      const response = await fetch(`${endpoint}/models`, {
         headers: { 'Authorization': `Bearer ${key}` }
       });
       if (!response.ok) return null;
       const data = await response.json();
-      const freeModels = data.data
-        .filter(m => m.pricing?.prompt === '0' && m.pricing?.completion === '0' && m.context_length > 1000)
-        .map(m => m.id);
-      console.log(`Loaded ${freeModels.length} free models from OpenRouter`);
-      return freeModels;
-    } catch (err) {
-      console.error('Failed to fetch free models:', err.message);
+      if (data && Array.isArray(data.data)) {
+        return data.data.map(m => m.id);
+      }
+      if (Array.isArray(data)) {
+        return data.map(m => m.id || m);
+      }
       return null;
+    } catch (err) {
+      console.error('Failed to fetch models:', err.message);
+      return null;
+    }
+  }
+
+  async ensureModelSelected() {
+    const envFile = this.parseEnvFile();
+    const modelFromEnv = this.getRuntimeEnvValue(envFile, 'AI_MODEL', config.model);
+    const hasExplicitModel = !!modelFromEnv;
+
+    while (true) {
+      const models = await this.fetchAvailableModels();
+      console.log('models: '+JSON.stringify(models));
+      if (models && models.length > 0) {
+        this.availableModelIds = models;
+        if (hasExplicitModel) {
+          if (this.availableModelIds.includes(modelFromEnv)) {
+            this.selectedModel = modelFromEnv;
+            console.log(`Model verification successful: "${this.selectedModel}" is available.`);
+            return;
+          } else {
+            console.error(`Error: Configured model "${modelFromEnv}" not found in available models. Retrying in 10s...`);
+          }
+        } else {
+          this.selectedModel = this.availableModelIds[0];
+          console.log(`No AI_MODEL set. Using first available model: "${this.selectedModel}"`);
+          return;
+        }
+      } else {
+        console.error('No models available or failed to fetch. Retrying in 10s...');
+      }
+      await this.sleep(10000);
     }
   }
 
   loadRuntimeConfig() {
     const envFile = this.parseEnvFile();
     const endpoint = this.getRuntimeEnvValue(envFile, 'AI_ENDPOINT', config.aiEndpoint);
-    const modelExplicitlySet = Object.prototype.hasOwnProperty.call(envFile, 'AI_MODEL') && envFile.AI_MODEL !== '';
-    const modelFromEnv = this.getRuntimeEnvValue(envFile, 'AI_MODEL', config.model);
     const key = this.getRuntimeEnvValue(envFile, 'AI_API_KEY', '');
-
-    let model;
-    if (modelExplicitlySet) {
-      model = modelFromEnv;
-    } else if (this.freeModelList && this.freeModelList.length > 0) {
-      model = this.freeModelList[Math.floor(Math.random() * this.freeModelList.length)];
-    } else {
-      throw new Error('AI_MODEL not set and free model selection failed.');
-    }
 
     return {
       aiEndpoint: endpoint,
-      model,
+      model: this.selectedModel,
       temperature: this.parseRuntimeNumber(this.getRuntimeEnvValue(envFile, 'AI_TEMPERATURE', '1'), 1),
       reasoningEffort: this.getRuntimeEnvValue(envFile, 'REASONING_EFFORT', 'medium'),
       reasoningTokens: this.parseRuntimeNumber(this.getRuntimeEnvValue(envFile, 'REASONING_TOKENS', '408'), 408),
@@ -592,8 +617,8 @@ class LichessBot {
       const shouldReconnect = await this.watchGameStream(gameInfo);
       if (!shouldReconnect) return;
 
-      console.log(`[${gameInfo.id}] Stream closed while game is active; reconnecting in 5s`);
-      await this.sleep(5000);
+      console.log(`[${gameInfo.id}] Stream closed while game is active; reconnecting in 60s`);
+      await this.sleep(60000);
     }
   }
 
@@ -842,6 +867,15 @@ class LichessBot {
     );
     fs.writeFileSync(
       `${errorsDir}/${baseName}.responsebody.json`,
+      `${JSON.stringify(responseBody, null, 2)}\n`
+    );
+
+    fs.writeFileSync(
+      `${errorsDir}/latest.requestbody.json`,
+      `${JSON.stringify(requestBody, null, 2)}\n`
+    );
+    fs.writeFileSync(
+      `${errorsDir}/latest.responsebody.json`,
       `${JSON.stringify(responseBody, null, 2)}\n`
     );
   }
