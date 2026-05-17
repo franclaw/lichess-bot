@@ -4,3 +4,4 @@ node_modules
 stream_logs
 ai_*.log
 errors/
+.local
