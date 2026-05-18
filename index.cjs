@@ -909,9 +909,9 @@ ${invalidMoves.length ? `\nRejected moves (must not be played): ${invalidMoves.j
 
 Choose exactly one UCI move copied from the Legal UCI moves line.
 Provide one short sentence of justification for your move, then your move.
-Your response must end with exactly: Justification: [one short sentence] My answer is: [UCI move]`;
+Your response must end with exactly: Justification: [one short sentence]. My move is: [UCI move]`;
     const messages = [
-      { role: 'system', content: `You are a chess master that is playing chess on lichess as side ${side}. You will be presented with the state of the chess board and a list of legal UCI moves. Choose exactly 1 UCI move from that explicit legal move list. Do not answer in SAN. You may reason privately, but your response must end with exactly: Justification: [one short sentence] My answer is: [UCI move] — for example: Justification: This controls the center. My answer is: e2e4.` },
+      { role: 'system', content: `You are a chess master that is playing chess on lichess as side ${side}. You will be presented with the state of the chess board and a list of legal UCI moves. Choose exactly 1 UCI move from that explicit legal move list. Do not answer in SAN. You may reason privately, but your response must end with exactly: "Justification: [one short sentence]. My move is: [UCI move]" — for example: "Justification: This controls the center. My move is: e2e4" (without the quotes)` },
       { role: 'user', content: prompt }
     ];
     
@@ -1080,7 +1080,7 @@ Your response must end with exactly: Justification: [one short sentence] My answ
         if (move) return { move, reasoning: null };
       }
 
-      const reasonAndMoveMatch = cleaned.match(new RegExp(`(?:^|\\n)\\s*Justification:\\s*([\\s\\S]*?)\\s+My answer\\s*(?:is)?\\s*[:\\-]?\\s*\`?(${uciPattern.source})\`?\\s*\\.?\\s*$`, 'i'));
+      const reasonAndMoveMatch = cleaned.match(new RegExp(`(?:^|\\n)\\s*Justification:\\s*([\\s\\S]*?)\\s+My move\\s*(?:is)?\\s*[:\\-]?\\s*\`?(${uciPattern.source})\`?\\s*\\.?\\s*$`, 'i'));
       if (reasonAndMoveMatch) {
         const move = normalizeMove(reasonAndMoveMatch[2]);
         if (!move) return null;
@@ -1090,17 +1090,12 @@ Your response must end with exactly: Justification: [one short sentence] My answ
         };
       }
 
-      const myAnswerOnlyMatch = cleaned.match(new RegExp(`(?:^|\\n)\\s*My answer\\s*(?:is)?\\s*[:\\-]?\\s*\`?(${uciPattern.source})\`?\\s*\\.?\\s*$`, 'i'));
+      const myAnswerOnlyMatch = cleaned.match(new RegExp(`(?:^|\\n)\\s*My move\\s*(?:is)?\\s*[:\\-]?\\s*\`?(${uciPattern.source})\`?\\s*\\.?\\s*$`, 'i'));
       if (myAnswerOnlyMatch) {
         const move = normalizeMove(myAnswerOnlyMatch[1]);
         if (move) return { move, reasoning: null };
       }
 
-      const finalAnswerMatch = cleaned.match(new RegExp(`(?:^|\\n)\\s*(?:Final answer|Answer)\\s*[:\\-]\\s*\`?(${uciPattern.source})\`?\\s*\\.?\\s*$`, 'i'));
-      if (finalAnswerMatch) {
-        const move = normalizeMove(finalAnswerMatch[1]);
-        if (move) return { move, reasoning: null };
-      }
 
       return null;
     };
