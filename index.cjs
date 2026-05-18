@@ -1080,7 +1080,7 @@ Your response must end with exactly: Justification: [one short sentence] My answ
         if (move) return { move, reasoning: null };
       }
 
-      const reasonAndMoveMatch = cleaned.match(new RegExp(`(?:^|\\n)\\s*Justification:\\s*([^\\n]*?)\\s+My answer is:?\\s*\`?(${uciPattern.source})\`?\\s*\\.?\\s*$`, 'i'));
+      const reasonAndMoveMatch = cleaned.match(new RegExp(`(?:^|\\n)\\s*Justification:\\s*([\\s\\S]*?)\\s+My answer\\s*(?:is)?\\s*[:\\-]?\\s*\`?(${uciPattern.source})\`?\\s*\\.?\\s*$`, 'i'));
       if (reasonAndMoveMatch) {
         const move = normalizeMove(reasonAndMoveMatch[2]);
         if (!move) return null;
@@ -1090,7 +1090,7 @@ Your response must end with exactly: Justification: [one short sentence] My answ
         };
       }
 
-      const myAnswerOnlyMatch = cleaned.match(new RegExp(`(?:^|\\n)\\s*My answer is:?\\s*\`?(${uciPattern.source})\`?\\s*\\.?\\s*$`, 'i'));
+      const myAnswerOnlyMatch = cleaned.match(new RegExp(`(?:^|\\n)\\s*My answer\\s*(?:is)?\\s*[:\\-]?\\s*\`?(${uciPattern.source})\`?\\s*\\.?\\s*$`, 'i'));
       if (myAnswerOnlyMatch) {
         const move = normalizeMove(myAnswerOnlyMatch[1]);
         if (move) return { move, reasoning: null };
