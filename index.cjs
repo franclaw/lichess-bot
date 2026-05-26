@@ -707,7 +707,7 @@ class LichessBot {
       return { resync: false };
     }
 
-    const legalMoveMenu = this.formatLegalMoveMenu(legalMoves);
+    const legalMoveMenu = legalMoves.map(m => m.san).join(', ');
     let correctionFeedback = '';
     let lastRejectedMove = '';
     const retryDelayMs = 300000; // 5 minutes
@@ -744,7 +744,7 @@ class LichessBot {
       if (!move || !/^[a-h][1-8][a-h][1-8][qrbn]?$/.test(move)) {
         console.log(`[${gameId}] Invalid move format: ${move || "<none>"} (Raw response: "${rawResponse}"). Retrying in 5m...`);
         this.saveAIFormatError(gameId, turnNumber, attemptNumber, result.requestBody, result.responseBody);
-        correctionFeedback = `Your previous answer "${rawResponse}" did not provide exactly one legal UCI move. Reply with one UCI move copied from the legal move list. Legal UCI moves again: ${legalMoveMenu}`;
+        correctionFeedback = `Your previous answer did not follow the required JSON format or did not provide a valid move. Please provide a JSON object with "reasoning" and "move" (in SAN format). Legal moves: ${legalMoveMenu}`;
         lastRejectedMove = move || "";
         if (move) invalidMoves.push(move);
         await this.sendChatMessage(gameId, 'both', `AI format error. Retrying in 5m...`);
@@ -753,11 +753,12 @@ class LichessBot {
       }
 
       if (!this.isLegalMove(position, fen, myColor, move)) {
-        console.log(`[${gameId}] AI chose illegal move: ${move}. Retrying in 5m...`);
-        correctionFeedback = `Your previous move "${move}" is illegal in this position. Choose a different UCI move from the legal move list. Legal UCI moves again: ${legalMoveMenu}`;
+        const moveSan = legalMoves.find(m => m.uci === move)?.san || move;
+        console.log(`[${gameId}] AI chose illegal move: ${move} (${moveSan}). Retrying in 5m...`);
+        correctionFeedback = `Your previous move "${moveSan}" is illegal in this position. Choose a different move from the legal move list in SAN format. Legal moves: ${legalMoveMenu}`;
         lastRejectedMove = move;
         invalidMoves.push(move);
-        await this.sendChatMessage(gameId, 'both', `AI illegal move: ${move}. Retrying in 5m...`);
+        await this.sendChatMessage(gameId, 'both', `AI illegal move: ${moveSan}. Retrying in 5m...`);
         await this.sleep(retryDelayMs);
         continue;
       }
@@ -880,39 +881,58 @@ class LichessBot {
     );
   }
 
+  buildThinkingBudgetRetryRequest(requestBody, content, maxTokens) {
+    const retryMaxTokens = Math.min(
+      512,
+      Math.max(256, Math.ceil((Number(maxTokens) || 0) * 0.25))
+    );
+    const budgetReachedMessage = [
+      'The thinking budget has been reached.',
+      'Do not continue reasoning.',
+      'Answer right away in the required JSON format using exactly one move from the legal moves list.'
+    ].join(' ');
+
+    const retryRequestBody = {
+      ...requestBody,
+      messages: [
+        ...(requestBody.messages || []),
+        { role: 'assistant', content: content || '' },
+        { role: 'user', content: budgetReachedMessage }
+      ],
+      max_tokens: retryMaxTokens,
+      reasoning: { effort: 'none' },
+      thinking: { type: 'disabled' },
+      thinking_budget_tokens: 0,
+      think: false
+    };
+
+    return retryRequestBody;
+  }
+
   async getAIMove(gameId, position, fen, lastOpponentMove, myColor, invalidMoves = [], legalMoves = [], runtimeConfig = this.loadRuntimeConfig(), correctionFeedback = '', lastRejectedMove = '') {
-    const side = myColor || 'the side to move';
-    const sideName = side.charAt(0).toUpperCase() + side.slice(1);
-    const chess = this.buildChess(position, fen);
-    const asciiBoard = this.generateAsciiBoard(chess);
-    const whitePieces = this.generatePieceList(chess, 'w');
-    const blackPieces = this.generatePieceList(chess, 'b');
-    
-    const legalMoveMenu = this.formatLegalMoveMenu(legalMoves);
-    const prompt = `FEN: ${fen}
+    const chessForHistory = this.buildChess(position, null);
+    const historySan = chessForHistory.history().join(' ');
+    const legalMovesSan = legalMoves.map(m => m.san).join(', ');
 
-Side to move: ${sideName}
-Board:
-${asciiBoard}
+    const systemPrompt = `You are playing a game of chess. You must analyze the position and choose a valid move from the legal moves available.
+<formatting rules>
+Previous game moves and current position will be provided.
+Respond with a JSON object containing your reasoning and move:
+{
+   "reasoning": "<your analysis and explanation>",
+   "move": "<your chosen move in EXACT SAN format>"
+}`;
 
-White pieces:
-${whitePieces}
+    const userPrompt = `Current board position (FEN): ${fen}
+Game history: ${historySan || '[no moves yet]'}
+Legal moves: ${legalMovesSan}
+Based on the current board position and game history, select one move from the legal moves list.
+Think carefully and choose the best move according to sound chess principles.
+Respond in the required JSON format with your reasoning and chosen move.${correctionFeedback ? `\n\nNote: ${correctionFeedback}` : ''}`;
 
-Black pieces:
-${blackPieces}
-
-Last opponent move (UCI): ${lastOpponentMove}.
-
-Legal UCI moves:
-${legalMoveMenu}
-${invalidMoves.length ? `\nRejected moves (must not be played): ${invalidMoves.join(', ')}.` : ''}${lastRejectedMove ? `\nLast rejected move: ${lastRejectedMove}.` : ''}${correctionFeedback ? `\nFailure feedback from previous attempt: ${correctionFeedback}.` : ''}
-
-Choose exactly one UCI move copied from the Legal UCI moves line.
-Provide one short sentence of justification for your move, then your move.
-Your response must end with exactly: Justification: [one short sentence]. My move is: [UCI move]`;
     const messages = [
-      { role: 'system', content: `You are a chess master that is playing chess on lichess as side ${side}. You will be presented with the state of the chess board and a list of legal UCI moves. Choose exactly 1 UCI move from that explicit legal move list. Do not answer in SAN. You may reason privately, but your response must end with exactly: "Justification: [one short sentence]. My move is: [UCI move]" — for example: "Justification: This controls the center. My move is: e2e4" (without the quotes)` },
-      { role: 'user', content: prompt }
+      { role: 'system', content: systemPrompt },
+      { role: 'user', content: userPrompt }
     ];
     
     try {
@@ -1026,6 +1046,70 @@ Your response must end with exactly: Justification: [one short sentence]. My mov
           // Log the output for this attempt
           this.logAI(gameId, runtimeConfig.model, 'output', content);
 
+          const finishReason = data.choices?.[0]?.finish_reason;
+          if (finishReason === 'length') {
+            const retryRequestBody = this.buildThinkingBudgetRetryRequest(
+              requestBody,
+              content,
+              runtimeConfig.maxTokens
+            );
+
+            console.log(`[${gameId}] AI hit length limit; retrying once with thinking disabled and max_tokens=${retryRequestBody.max_tokens}`);
+            this.logAI(gameId, runtimeConfig.model, 'input_budget_retry', JSON.stringify(retryRequestBody.messages, null, 2));
+
+            const retryResponse = await fetch(`${runtimeConfig.aiEndpoint}/chat/completions`, {
+              method: 'POST',
+              headers,
+              body: JSON.stringify(retryRequestBody)
+            });
+
+            if (!retryResponse.ok) {
+              const errorText = await retryResponse.text().catch(() => 'no body');
+              console.error(`[${gameId}] AI budget retry error status=${retryResponse.status} body=${errorText}`);
+              throw new Error(`AI API budget retry error: ${retryResponse.status}`);
+            }
+
+            const retryResponseText = await retryResponse.text();
+            let retryData;
+            try {
+              retryData = JSON.parse(retryResponseText);
+            } catch {
+              throw new Error(retryResponseText ? `AI API budget retry returned invalid JSON: ${retryResponseText}` : 'AI API budget retry returned invalid JSON');
+            }
+
+            if (retryData.error) {
+              console.error(`[${gameId}] AI provider returned budget retry error:`, JSON.stringify(retryData.error));
+              throw new Error(`AI provider budget retry error: ${retryData.error.message || retryData.error.code}`);
+            }
+
+            const retryContent =
+              retryData.choices?.[0]?.message?.content ||
+              retryData.choices?.[0]?.message?.reasoning_content ||
+              retryData.choices?.[0]?.message?.reasoning ||
+              retryData.choices?.[0]?.text ||
+              '';
+
+            if (!retryContent) {
+              console.error(`[${gameId}] AI budget retry response empty choice content`);
+              this.saveAIFormatError(gameId, this.getTurnNumber(position), attempt + 1, retryRequestBody, retryData);
+              throw new Error('AI budget retry response empty');
+            }
+
+            this.logAI(gameId, runtimeConfig.model, 'output_budget_retry', retryContent);
+
+            return {
+              move: this.parseMove(retryContent, legalMoves),
+              content: retryContent,
+              attempt: attempt + 1,
+              requestBody: retryRequestBody,
+              responseBody: retryData,
+              messages: [
+                ...retryRequestBody.messages,
+                { role: 'assistant', content: retryContent }
+              ]
+            };
+          }
+
           return {
             move: this.parseMove(content, legalMoves),
             content,
@@ -1059,43 +1143,74 @@ Your response must end with exactly: Justification: [one short sentence]. My mov
     if (!content) return { move: null, reasoning: null };
 
     const legalByUci = new Map(legalMoves.map((move) => [move.uci, move]));
+    const legalBySan = new Map(legalMoves.map((move) => [move.san, move]));
+
     const normalizeMove = (move) => {
       const trimmed = String(move || '').trim();
+      // Try SAN match first
+      if (legalBySan.has(trimmed)) return legalBySan.get(trimmed).uci;
+      // Then try UCI match
+      if (legalByUci.has(trimmed)) return trimmed;
+      // Basic UCI validation as final fallback
       if (!/^[a-h][1-8][a-h][1-8][qrbn]?$/.test(trimmed)) return null;
       if (legalByUci.size && !legalByUci.has(trimmed)) return null;
       return trimmed;
     };
+
     const stripWrapping = (text) => String(text)
       .trim()
-      .replace(/^```(?:text|uci)?\s*/i, '')
+      .replace(/^```(?:json|text|uci)?\s*/i, '')
       .replace(/\s*```$/i, '')
       .trim();
+
+    const cleaned = stripWrapping(content);
+
+    // Try JSON parsing
+    try {
+      const start = cleaned.indexOf('{');
+      const end = cleaned.lastIndexOf('}');
+      if (start !== -1 && end !== -1 && end > start) {
+        const jsonStr = cleaned.substring(start, end + 1);
+        const data = JSON.parse(jsonStr);
+        if (data.move) {
+          const move = normalizeMove(data.move);
+          if (move) {
+            return {
+              move,
+              reasoning: data.reasoning || null
+            };
+          }
+        }
+      }
+    } catch (e) {
+      // Ignore JSON parse errors and fall back to legacy parsing
+    }
+
     const uciPattern = /[a-h][1-8][a-h][1-8][qrbn]?/;
 
     const parseStrictFinalAnswer = (text) => {
-      const cleaned = stripWrapping(text);
-      const exactMoveMatch = cleaned.match(new RegExp(`^(${uciPattern.source})$`));
-      if (exactMoveMatch) {
-        const move = normalizeMove(exactMoveMatch[1]);
-        if (move) return { move, reasoning: null };
-      }
+      const cleanedText = stripWrapping(text);
+      
+      // Check if it's just a move (UCI or SAN)
+      const move = normalizeMove(cleanedText);
+      if (move && cleanedText.length < 10) return { move, reasoning: null };
 
-      const reasonAndMoveMatch = cleaned.match(new RegExp(`(?:^|\\n)\\s*Justification:\\s*([\\s\\S]*?)\\s+My move\\s*(?:is)?\\s*[:\\-]?\\s*\`?(${uciPattern.source})\`?\\s*\\.?\\s*$`, 'i'));
+      const reasonAndMoveMatch = cleanedText.match(new RegExp(`(?:^|\\n)\\s*Justification:\\s*([\\s\\S]*?)\\s+My move\\s*(?:is)?\\s*[:\\-]?\\s*\`?(${uciPattern.source}|[A-Z][a-z0-9+#=]*|O-O(?:-O)?)\`?\\s*\\.?\\s*$`, 'i'));
       if (reasonAndMoveMatch) {
-        const move = normalizeMove(reasonAndMoveMatch[2]);
-        if (!move) return null;
-        return {
-          move,
-          reasoning: reasonAndMoveMatch[1].trim() || null
-        };
+        const moveUci = normalizeMove(reasonAndMoveMatch[2]);
+        if (moveUci) {
+          return {
+            move: moveUci,
+            reasoning: reasonAndMoveMatch[1].trim() || null
+          };
+        }
       }
 
-      const myAnswerOnlyMatch = cleaned.match(new RegExp(`(?:^|\\n)\\s*My move\\s*(?:is)?\\s*[:\\-]?\\s*\`?(${uciPattern.source})\`?\\s*\\.?\\s*$`, 'i'));
+      const myAnswerOnlyMatch = cleanedText.match(new RegExp(`(?:^|\\n)\\s*My move\\s*(?:is)?\\s*[:\\-]?\\s*\`?(${uciPattern.source}|[A-Z][a-z0-9+#=]*|O-O(?:-O)?)\`?\\s*\\.?\\s*$`, 'i'));
       if (myAnswerOnlyMatch) {
-        const move = normalizeMove(myAnswerOnlyMatch[1]);
-        if (move) return { move, reasoning: null };
+        const moveUci = normalizeMove(myAnswerOnlyMatch[1]);
+        if (moveUci) return { move: moveUci, reasoning: null };
       }
-
 
       return null;
     };
