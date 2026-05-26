@@ -1,8 +1,14 @@
 const config = require('./config.cjs');
 const fs = require('node:fs');
 const { Chess } = require('chess.js');
+const { Agent } = require('undici');
 
 const GAME_RUNTIME_CONFIG_FILE = '.game-runtime-config.json';
+const AI_FETCH_TIMEOUT_MS = Number(process.env.AI_FETCH_TIMEOUT_MS || 20 * 60 * 1000);
+const aiFetchDispatcher = new Agent({
+  headersTimeout: AI_FETCH_TIMEOUT_MS,
+  bodyTimeout: AI_FETCH_TIMEOUT_MS
+});
 
 class LichessBot {
   constructor() {
@@ -852,6 +858,42 @@ class LichessBot {
     }
   }
 
+  logAIDebug(gameId, model, type, value) {
+    this.logAI(gameId, model, type, JSON.stringify(value, null, 2));
+  }
+
+  summarizeAIRequest(requestBody) {
+    return {
+      model: requestBody.model,
+      temperature: requestBody.temperature,
+      max_tokens: requestBody.max_tokens,
+      reasoning: requestBody.reasoning || null,
+      thinking: requestBody.thinking || null,
+      thinking_budget_tokens: Object.prototype.hasOwnProperty.call(requestBody, 'thinking_budget_tokens')
+        ? requestBody.thinking_budget_tokens
+        : null,
+      think: Object.prototype.hasOwnProperty.call(requestBody, 'think') ? requestBody.think : null,
+      stream: requestBody.stream,
+      message_count: Array.isArray(requestBody.messages) ? requestBody.messages.length : 0,
+      message_roles: Array.isArray(requestBody.messages) ? requestBody.messages.map((m) => m.role) : []
+    };
+  }
+
+  summarizeAIResponse(data, content) {
+    const choice = data?.choices?.[0] || {};
+    const message = choice.message || {};
+    return {
+      id: data?.id || null,
+      object: data?.object || null,
+      finish_reason: choice.finish_reason || null,
+      content_length: String(content || '').length,
+      message_content_length: String(message.content || '').length,
+      reasoning_content_length: String(message.reasoning_content || '').length,
+      reasoning_length: String(message.reasoning || '').length,
+      usage: data?.usage || null
+    };
+  }
+
   getTurnNumber(position) {
     const moves = String(position || '').trim().split(/\s+/).filter(Boolean);
     return Math.floor(moves.length / 2) + 1;
@@ -886,10 +928,23 @@ class LichessBot {
       512,
       Math.max(256, Math.ceil((Number(maxTokens) || 0) * 0.25))
     );
+    const lastUserMessage = [...(requestBody.messages || [])]
+      .reverse()
+      .find((message) => message.role === 'user')?.content || '';
+    const legalMovesMatch = lastUserMessage.match(/Legal moves:\s*([^\n]+)/i);
+    const legalMovesText = legalMovesMatch ? legalMovesMatch[1].trim() : '';
     const budgetReachedMessage = [
       'The thinking budget has been reached.',
       'Do not continue reasoning.',
+      legalMovesText ? `Your move field must be copied verbatim from this legal moves list: ${legalMovesText}.` : '',
+      'Do not invent another move, even if it looks legal.',
       'Answer right away in the required JSON format using exactly one move from the legal moves list.'
+    ].filter(Boolean).join(' ');
+
+    const retrySystemMessage = [
+      'Critical final-answer rule:',
+      'The JSON "move" value must exactly match one SAN string from the legal moves list in the user prompt.',
+      'If a candidate move is not listed there, it is illegal for this response.'
     ].join(' ');
 
     const retryRequestBody = {
@@ -897,6 +952,7 @@ class LichessBot {
       messages: [
         ...(requestBody.messages || []),
         { role: 'assistant', content: content || '' },
+        { role: 'system', content: retrySystemMessage },
         { role: 'user', content: budgetReachedMessage }
       ],
       max_tokens: retryMaxTokens,
@@ -984,10 +1040,12 @@ Respond in the required JSON format with your reasoning and chosen move.${correc
       let attempt = 0;
       while (true) {
         this.logAI(gameId, runtimeConfig.model, 'input', JSON.stringify(messages, null, 2));
+        this.logAIDebug(gameId, runtimeConfig.model, 'input_request_meta', this.summarizeAIRequest(requestBody));
         try {
           const response = await fetch(`${runtimeConfig.aiEndpoint}/chat/completions`, {
             method: 'POST',
             headers,
+            dispatcher: aiFetchDispatcher,
             body: JSON.stringify(requestBody)
           });
 
@@ -1047,6 +1105,13 @@ Respond in the required JSON format with your reasoning and chosen move.${correc
           this.logAI(gameId, runtimeConfig.model, 'output', content);
 
           const finishReason = data.choices?.[0]?.finish_reason;
+          const responseSummary = this.summarizeAIResponse(data, content);
+          this.logAIDebug(gameId, runtimeConfig.model, 'output_response_meta', responseSummary);
+          console.log(
+            `[${gameId}] AI response finish_reason=${finishReason || '<missing>'} ` +
+            `content_length=${responseSummary.content_length} ` +
+            `usage=${JSON.stringify(responseSummary.usage || {})}`
+          );
           if (finishReason === 'length') {
             const retryRequestBody = this.buildThinkingBudgetRetryRequest(
               requestBody,
@@ -1054,12 +1119,22 @@ Respond in the required JSON format with your reasoning and chosen move.${correc
               runtimeConfig.maxTokens
             );
 
-            console.log(`[${gameId}] AI hit length limit; retrying once with thinking disabled and max_tokens=${retryRequestBody.max_tokens}`);
+            const retryRequestSummary = this.summarizeAIRequest(retryRequestBody);
+            console.log(
+              `[${gameId}] AI hit length limit; retrying once with thinking disabled ` +
+              `max_tokens=${retryRequestBody.max_tokens} ` +
+              `reasoning=${JSON.stringify(retryRequestBody.reasoning)} ` +
+              `thinking=${JSON.stringify(retryRequestBody.thinking)} ` +
+              `think=${retryRequestBody.think}`
+            );
+            this.logAIDebug(gameId, runtimeConfig.model, 'input_budget_retry_meta', retryRequestSummary);
+            this.logAIDebug(gameId, runtimeConfig.model, 'input_budget_retry_request', retryRequestBody);
             this.logAI(gameId, runtimeConfig.model, 'input_budget_retry', JSON.stringify(retryRequestBody.messages, null, 2));
 
             const retryResponse = await fetch(`${runtimeConfig.aiEndpoint}/chat/completions`, {
               method: 'POST',
               headers,
+              dispatcher: aiFetchDispatcher,
               body: JSON.stringify(retryRequestBody)
             });
 
@@ -1096,6 +1171,13 @@ Respond in the required JSON format with your reasoning and chosen move.${correc
             }
 
             this.logAI(gameId, runtimeConfig.model, 'output_budget_retry', retryContent);
+            const retryResponseSummary = this.summarizeAIResponse(retryData, retryContent);
+            this.logAIDebug(gameId, runtimeConfig.model, 'output_budget_retry_meta', retryResponseSummary);
+            console.log(
+              `[${gameId}] AI budget retry response finish_reason=${retryResponseSummary.finish_reason || '<missing>'} ` +
+              `content_length=${retryResponseSummary.content_length} ` +
+              `usage=${JSON.stringify(retryResponseSummary.usage || {})}`
+            );
 
             return {
               move: this.parseMove(retryContent, legalMoves),
@@ -1123,10 +1205,11 @@ Respond in the required JSON format with your reasoning and chosen move.${correc
           };
         } catch (err) {
           const delay = Math.min(Math.pow(2, attempt) * 2000, MAX_DELAY);
+          const cause = err.cause ? `; cause=${err.cause.code || err.cause.name || 'unknown'} ${err.cause.message || ''}` : '';
           if (err.isTransient) {
-            console.log(`[${gameId}] Transient AI error, retrying in ${Math.round(delay/1000)}s (attempt ${attempt + 1}): ${err.message}`);
+            console.log(`[${gameId}] Transient AI error, retrying in ${Math.round(delay/1000)}s (attempt ${attempt + 1}): ${err.message}${cause}`);
           } else {
-            console.error(`[${gameId}] AI attempt ${attempt + 1} failed: ${err.message}. Retrying in ${Math.round(delay/1000)}s...`);
+            console.error(`[${gameId}] AI attempt ${attempt + 1} failed: ${err.message}${cause}. Retrying in ${Math.round(delay/1000)}s...`);
           }
           await this.sleep(delay);
           attempt++;
