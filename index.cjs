@@ -1007,19 +1007,18 @@ Respond in the required JSON format with your reasoning and chosen move.${correc
       let reasoning = null;
       let thinking = null;
       if (runtimeConfig.reasoningEffort || runtimeConfig.reasoningTokens) {
-        reasoning = {};
-        if (runtimeConfig.reasoningEffort) {
-          reasoning.effort = runtimeConfig.reasoningEffort;
-        }
-        if (runtimeConfig.reasoningTokens) {
-          reasoning.max_tokens = runtimeConfig.reasoningTokens;
-        }
-      }
-
-      if (!isOpenRouter) {
-        thinking = { type: 'enabled' };
-        if (runtimeConfig.reasoningTokens) {
-          thinking.budget_tokens = runtimeConfig.reasoningTokens;
+        if (isOpenRouter) {
+          reasoning = {};
+          if (runtimeConfig.reasoningEffort) {
+            reasoning.effort = runtimeConfig.reasoningEffort;
+          } else if (runtimeConfig.reasoningTokens) {
+            reasoning.max_tokens = runtimeConfig.reasoningTokens;
+          }
+        } else {
+          thinking = { type: 'enabled' };
+          if (runtimeConfig.reasoningTokens) {
+            thinking.budget_tokens = runtimeConfig.reasoningTokens;
+          }
         }
       }
 
