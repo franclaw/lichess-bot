@@ -129,8 +129,18 @@ class LichessBot {
     return {
       async *[Symbol.asyncIterator]() {
         while (true) {
-          const { done, value } = await reader.read();
-          if (done) break;
+          let result;
+          try {
+            result = await reader.read();
+          } catch (err) {
+            console.error(`[STREAM] Read error from ${url}:`, err.stack || err.message);
+            throw err;
+          }
+          const { done, value } = result;
+          if (done) {
+            console.log(`[STREAM] Stream done (reader closed) for ${url}`);
+            break;
+          }
           
           buffer += decoder.decode(value, { stream: true });
           const lines = buffer.split('\n');
@@ -228,14 +238,14 @@ class LichessBot {
     console.log(`=== Watching game: ${gameId} ===`);
     const promise = this.watchGame(gameInfo)
       .catch((err) => {
-        console.error(`[${gameId}] Watch error:`, err.message);
+        console.error(`[${gameId}] Watch error (watcher terminated):`, err.stack || err.message);
       })
       .finally(() => {
         this.activeGames.delete(gameId);
         this.gameRuntimeConfig.delete(gameId);
         this.gameChatIntroSent.delete(gameId);
         this.deleteStoredGameRuntimeConfig(gameId);
-        console.log(`[${gameId}] Watcher stopped`);
+        console.log(`[${gameId}] Watcher stopped (cleanup complete)`);
       });
 
     this.activeGames.set(gameId, promise);
@@ -620,8 +630,16 @@ class LichessBot {
 
   async watchGame(gameInfo) {
     while (true) {
-      const shouldReconnect = await this.watchGameStream(gameInfo);
-      if (!shouldReconnect) return;
+      try {
+        const shouldReconnect = await this.watchGameStream(gameInfo);
+        if (!shouldReconnect) {
+          console.log(`[${gameInfo.id}] Watcher terminated normally (game over)`);
+          return;
+        }
+      } catch (err) {
+        console.error(`[${gameInfo.id}] Watcher terminated with error:`, err.stack || err.message);
+        return;
+      }
 
       console.log(`[${gameInfo.id}] Stream closed while game is active; reconnecting in 60s`);
       await this.sleep(60000);
