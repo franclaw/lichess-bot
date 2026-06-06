@@ -670,7 +670,11 @@ class LichessBot {
         const event = JSON.parse(line);
         const state = this.getStatePayload(event);
         const status = state.status || event.status;
-        if (status && status !== 'started') gameStillActive = false;
+        if (status && status !== 'started') {
+          gameStillActive = false;
+          console.log(`[${gameId}] Game over (status=${status})`);
+          continue;
+        }
         
         // Update FEN
         if (event.fen) fen = event.fen;
